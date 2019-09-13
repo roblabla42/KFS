@@ -13,11 +13,11 @@
 //! the built-ins to the kernel, and load them with a primitive ELF loader. This loader
 //! does not do any dynamic loading or provide ASLR (though that is up for change)
 
-use multiboot2::ModuleTag;
 use core::slice;
 use xmas_elf::ElfFile;
 use xmas_elf::program::{ProgramHeader, Type::Load, SegmentData};
 use crate::mem::{VirtualAddress, PhysicalAddress};
+use crate::i386::multiboot::ModuleInformation;
 use crate::paging::{PAGE_SIZE, MappingAccessRights, process_memory::ProcessMemory, kernel_memory::get_kernel_memory};
 use sunrise_libkern::MemoryType;
 use crate::frame_allocator::PhysicalMemRegion;
@@ -42,10 +42,10 @@ pub struct MappedGrubModule<'a> {
 /// # Error:
 /// 
 /// * VirtualMemoryExhaustion: cannot find virtual memory where to map it.
-pub fn map_grub_module(module: &ModuleTag) -> Result<MappedGrubModule<'_>, KernelError> {
-    let start_address_aligned = PhysicalAddress(utils::align_down(module.start_address() as usize, PAGE_SIZE));
+pub fn map_grub_module(module: &ModuleInformation) -> Result<MappedGrubModule<'_>, KernelError> {
+    let start_address_aligned = PhysicalAddress(utils::align_down(module.start_address(), PAGE_SIZE));
     // Use start_address_aligned to calculate the number of pages, to avoid an off-by-one.
-    let module_len_aligned = utils::align_up(module.end_address() as usize - start_address_aligned.addr(), PAGE_SIZE);
+    let module_len_aligned = utils::align_up(module.end_address() - start_address_aligned.addr(), PAGE_SIZE);
 
     let mapping_addr = {
         let mut page_table = get_kernel_memory();
@@ -61,8 +61,8 @@ pub fn map_grub_module(module: &ModuleTag) -> Result<MappedGrubModule<'_>, Kerne
     };
 
     // the module offset in the mapping
-    let start = mapping_addr + (module.start_address() as usize % PAGE_SIZE);
-    let len = module.end_address() as usize - module.start_address() as usize;
+    let start = mapping_addr + (module.start_address() % PAGE_SIZE);
+    let len = module.end_address() as usize - module.start_address();
 
     // try parsing it as an elf
     let elf = ElfFile::new(unsafe {

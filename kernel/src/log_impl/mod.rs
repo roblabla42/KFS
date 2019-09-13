@@ -56,7 +56,7 @@ pub fn early_init() {
 /// Reinitializes the logger using the cmdline. This requires the heap.
 pub fn init() {
     let logger = LOGGER.r#try().expect("early_init to be called before init");
-    let cmdline = get_boot_information().command_line_tag().unwrap().command_line();
-    let newfilter = filter::Builder::new().parse(cmdline).build();
+    let cmdline = get_boot_information().command_line().unwrap();
+    let newfilter = filter::Builder::new().parse(cmdline.as_str()).build();
     *logger.filter.write() = newfilter;
 }

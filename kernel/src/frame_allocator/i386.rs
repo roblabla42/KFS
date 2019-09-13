@@ -314,15 +314,9 @@ pub fn init(boot_info: &BootInformation) {
             continue;
         }
 
-        if memarea.memory_type() == 1 {
-            mark_area_free(&mut allocator.memory_bitmap,
-                                        memarea.start_address() as usize,
-                                        memarea.end_address() as usize);
-        } else {
-            mark_area_reserved(&mut allocator.memory_bitmap,
-                                        memarea.start_address() as usize,
-                                        memarea.end_address() as usize);
-        }
+        mark_area_free(&mut allocator.memory_bitmap,
+                                    memarea.start_address() as usize,
+                                    memarea.end_address() as usize);
 
     }
 

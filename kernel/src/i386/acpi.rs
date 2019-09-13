@@ -99,17 +99,14 @@ pub unsafe fn init() {
     let mut is_init = false;
 
     if let Some(multiboot_info) = multiboot::try_get_boot_information() {
-        if let Some(rsdp_v1_info) = multiboot_info.rsdp_v1_tag() {
-            info!("Found RSDP v1 multiboot2 tag at address {:x}", rsdp_v1_info.rsdt_address());
+        if let Some(rsdp_virtual_address) = multiboot_info.rsdp_v1_virtual_address() {
+            info!("Found RSDP v1 multiboot2 tag at address {:x}", rsdp_virtual_address);
 
-            // Multiboot2 hold a copy of the RSDP but have two extra fields at the begining, we are ignoring them.
-            let rsdp_virtual_address = (rsdp_v1_info as *const _ as usize) + 0x8;
             is_init = parse_rsdp_tag(&mut handler, rsdp_virtual_address);
         }
-        else if let Some(rsdp_v2_info) = multiboot_info.rsdp_v2_tag() {
-            info!("Found RSDP v2 multiboot2 tag at address {:x}", rsdp_v2_info.xsdt_address());
+        else if let Some(rsdp_virtual_address) = multiboot_info.rsdp_v2_virtual_address() {
+            info!("Found RSDP v2 multiboot2 tag at address {:x}", rsdp_virtual_address);
 
-            let rsdp_virtual_address = (rsdp_v2_info as *const _ as usize) + 0x8;
             is_init = parse_rsdp_tag(&mut handler, rsdp_virtual_address);
         }
     }

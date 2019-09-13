@@ -17,7 +17,7 @@ sunrise-libutils = { path = "../libutils" }
 sunrise-libkern = { path = "../libkern" }
 bit_field = "0.10.0"
 bitflags = "1.1"
-multiboot2 = { git = "https://github.com/sunriseos/multiboot2-elf64.git" }
+multiboot2 = "0.8"
 spin = "0.5"
 linked_list_allocator = "0.6.4"
 log = "0.4.6"
