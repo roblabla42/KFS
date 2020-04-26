@@ -55,7 +55,6 @@
 use crate::sync::SpinLock;
 use crate::io::Io;
 use crate::i386::pio::Pio;
-use crate::timer;
 
 /// The oscillator frequency when not divided, in hertz.
 const OSCILLATOR_FREQ: usize = 1193182;
@@ -127,86 +126,6 @@ impl PITPorts {
         port.write(lo);
         port.write(hi);
     }
-}
-
-/// Channel 2
-struct PITChannel2<'ports> {
-    /// A reference to the PITPorts structure.
-    ports: &'ports mut PITPorts
-}
-
-impl<'ports> PITChannel2<'ports> {
-
-    /// Sets mode #0 for Channel 2.
-    fn init(ports: &mut PITPorts) -> PITChannel2<'_> {
-        ports.port_cmd.write(
-            0b10110000 // channel 2, lobyte/hibyte, interrupt on terminal count
-        );
-        PITChannel2 { ports }
-    }
-
-    /// Sets the countdown reset value by writing to channel 2 data port.
-    /// Starts the countdown as a side-effect
-    fn start_countdown(&mut self, value: u16) {
-        self.ports.write_reload_value(ChannelSelector::Channel2, value);
-    }
-
-    /// Checks if the countdown is finished
-    fn is_countdown_finished(&self) -> bool {
-        Port61Flags::from_bits(self.ports.port_61.read()).unwrap()
-            .contains(Port61Flags::OUT2_STATUS)
-    }
-
-    /// Waits until countdown is finished
-    fn wait_countdown_is_finished(&self) {
-        while !(Port61Flags::from_bits(self.ports.port_61.read()).unwrap()
-            .contains(Port61Flags::OUT2_STATUS))
-            {
-                // You spin me right round, baby
-                // right round !
-                // Like a record, baby
-                // right round
-                // round round !
-            }
-    }
-
-    /// Spin waits for at least `ms` amount of milliseconds
-    fn spin_wait_ms(&mut self, ms: usize) {
-        let ticks_to_wait: usize = (OSCILLATOR_FREQ / 1000) * ms;
-
-        // wait for max amount of time multiples times
-        if ticks_to_wait >= u16::max_value() as usize {
-            for _ in (0..=ticks_to_wait).step_by(u16::max_value() as usize) {
-                self.start_countdown(u16::max_value());
-                self.wait_countdown_is_finished();
-            }
-        }
-
-        // last iter
-        let remaining_to_wait = ticks_to_wait as u16;
-        if remaining_to_wait > 0 {
-            self.start_countdown(remaining_to_wait);
-            self.wait_countdown_is_finished();
-        }
-    }
-}
-
-/// Spin waits for at least `ms` amount of milliseconds
-pub fn spin_wait_ms(ms: usize) {
-    let mut ports = PIT_PORTS.lock();
-    let mut chan2 = PITChannel2::init(&mut ports);
-    chan2.spin_wait_ms(ms);
-}
-
-/// Initialize the channel 0 to send recurring irqs.
-pub unsafe fn init_channel_0() {
-    let mut ports = PIT_PORTS.lock();
-    ports.port_cmd.write(
-        0b00110100 // channel 0, lobyte/hibyte, rate generator
-    );
-    ports.write_reload_value(ChannelSelector::Channel0, CHAN_0_DIVISOR);
-
-    timer::set_kernel_timer_info(0, OSCILLATOR_FREQ as u64, 1_000_000_000 / (CHAN_0_FREQUENCY as u64));
 }
 
 /// Prevent the PIT from generating interrupts.

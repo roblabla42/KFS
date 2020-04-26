@@ -1051,7 +1051,7 @@ macro_rules! irq_handler {
         /// Array of interrupt handlers.
         ///
         /// The position in the array defines the IRQ this handler is targeting. See [`irq_handler`].
-        static IRQ_HANDLERS : [extern "C" fn(); 17] = [
+        static IRQ_HANDLERS : [extern "C" fn(); 16] = [
             $(
                 $asm_wrapper_name,
             )*
@@ -1076,8 +1076,22 @@ irq_handler!(
     13, irq13_handler,         irq13_handler_asm_wrapper,         irq13_handler_rust_wrapper;
     14, primary_ata_handler,   primary_ata_handler_asm_wrapper,   primary_ata_handler_rust_wrapper;
     15, secondary_ata_handler, secondary_ata_handler_asm_wrapper, secondary_ata_handler_rust_wrapper;
-    16, hpet_handler,          hpet_handler_asm_wrapper,          hpet_handler_rust_wrapper;
 );
+
+generate_trap_gate_handler!(name: "Timer Irq handler",
+                has_errcode: false,
+                wrapper_asm_fnname: hpet_handler_asm_wrapper,
+                wrapper_rust_fnname: hpet_handler_rust_wrapper,
+                kernel_fault_strategy: ignore,
+                user_fault_strategy: ignore,
+                handler_strategy: hpet_handler
+);
+
+/// HPET Irq handler
+fn hpet_handler(_exception_name: &'static str, _hwcontext: &mut UserspaceHardwareContext, _has_errcode: bool) {
+    crate::i386::interrupt::acknowledge(16);
+    crate::timer::wakeup_waiters();
+}
 
 lazy_static! {
     /// IDT address. Initialized in `init()`.
@@ -1125,6 +1139,9 @@ pub unsafe fn init() {
             for (i, handler) in IRQ_HANDLERS.iter().enumerate() {
                 (*idt).interrupts[i].set_interrupt_gate_addr(*handler as u32);
             }
+
+            // Add the custom entry for the HPET.
+            (*idt).interrupts[16].set_interrupt_gate_addr(hpet_handler_asm_wrapper as u32);
 
             // Add entry for syscalls
             let syscall_int = (*idt)[0x80].set_interrupt_gate_addr(syscall_interrupt_asm_wrapper as u32);

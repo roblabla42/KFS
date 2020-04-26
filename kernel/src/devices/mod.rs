@@ -12,26 +12,21 @@ use crate::i386::acpi;
 
 /// Initialize a timer to be used by the OS.
 pub fn init_timer() {
-    let mut use_pit = false;
+    let mut use_hpet = false;
     if let Some(acpi_info) = acpi::try_get_acpi_information() {
         if let Some(hpet_info) = acpi_info.hpet() {
             let hpet_init_res = unsafe { hpet::init(&hpet_info) };
-            if !hpet_init_res {
-                info!("Initialization of HPET failed, switching to PIT");
-                use_pit = true;
-            } else {
+            if hpet_init_res {
                 info!("Initialized HPET");
+                use_hpet = true;
             }
         }
-    } else {
-        use_pit = true;
     }
 
-    if use_pit {
-        unsafe { pit::init_channel_0() };
-        info!("Initialized PIT");
-    } else {
+    if use_hpet {
         unsafe { pit::disable() };
         info!("Disabled PIT");
+    } else {
+        panic!("Cannot initialize timer! An HPET is required!")
     }
 }

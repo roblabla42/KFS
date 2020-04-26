@@ -53,6 +53,7 @@ pub unsafe fn permanently_disable_interrupts() {
 // BODY: solve the problem, but the scheduler would be unable to consume such
 // BODY: locks. Maybe we could have an unsafe "scheduler_relock" function that
 // BODY: may only be called from the scheduler?
+#[derive(Default)]
 pub struct SpinLockIRQ<T: ?Sized> {
     /// SpinLock we wrap.
     internal: SpinLock<T>
