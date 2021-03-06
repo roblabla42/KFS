@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["early_init","Initializes the Logger in a heapless environment."],["init","Reinitializes the logger using the cmdline. This requires the heap."]],"mod":[["filter","Filtering for log records."]],"static":[["LOGGER",""]],"struct":[["Logger",""]]});

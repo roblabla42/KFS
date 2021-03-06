@@ -1,0 +1,1 @@
+initSidebarItems({"constant":[["RESERVED_HEAP_SIZE","Maximum size of our Kernel Heap."]],"struct":[["Allocator","Simple wrapper around linked_list_allocator, growing heap by allocating pages with the frame allocator as necessary."]]});

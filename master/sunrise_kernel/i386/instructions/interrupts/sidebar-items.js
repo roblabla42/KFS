@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["are_enabled","Returns whether interrupts are enabled."],["cli","Disable interrupts"],["hlt","Waits until an interrupt is fired"],["sti","Enable interrupts"],["without_interrupts","Run a closue with disabled interrupts."]]});

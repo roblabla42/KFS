@@ -1,0 +1,1 @@
+initSidebarItems({"enum":[["MappingFrames","Frames associated with a [Mapping]."]],"struct":[["Mapping","A memory mapping. Stores the address, the length, and the type it maps. A mapping is guaranteed to have page aligned address, length and offset, and the length will never be zero."]]});

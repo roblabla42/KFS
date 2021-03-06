@@ -1,0 +1,1 @@
+initSidebarItems({"constant":[["COM1",""]],"fn":[["bootstrap_inb",""],["bootstrap_log","Sends a string to COM1."],["bootstrap_outb",""],["init_bootstrap_log","Init the rs232 COM1. Must be called before logging anything."]],"struct":[["Serial","A logger that sends its output to COM1."]]});

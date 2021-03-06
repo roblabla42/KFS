@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["main","Print the help message."]],"static":[["HELP","Help string."]]});

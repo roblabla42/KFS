@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["main","Test function ensuring divide by zero interruption kills only the current process."]],"static":[["HELP","Help string."]]});

@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["FRAMEBUFFER",""],["Framebuffer","A wrapper around a linear framebuffer. The framebuffer is usually acquired through the map_framebuffer syscall."],["VBEColor","A rgb color"]]});

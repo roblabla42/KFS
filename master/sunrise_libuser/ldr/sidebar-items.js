@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["ILoaderInterfaceProxy","A mishmash of Nintendo's loader and pm in a single disgusting service."]],"trait":[["ILoaderInterface","A mishmash of Nintendo's loader and pm in a single disgusting service."],["ILoaderInterfaceAsync","A mishmash of Nintendo's loader and pm in a single disgusting service."]]});

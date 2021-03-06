@@ -1,0 +1,46 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="API documentation for the Rust `process_switch` fn in crate `sunrise_kernel`."><meta name="keywords" content="rust, rustlang, rust-lang, process_switch"><title>sunrise_kernel::i386::process_switch::process_switch - Rust</title><link rel="stylesheet" type="text/css" href="../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../dark.css"><link rel="stylesheet" type="text/css" href="../../../light.css" id="themeStyle"><script src="../../../storage.js"></script><noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="shortcut icon" href="../../../favicon.ico"><style type="text/css">#crate-search{background-image:url("../../../down-arrow.svg");}</style></head><body class="rustdoc fn"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu">&#9776;</div><a href='../../../sunrise_kernel/index.html'><div class='logo-container'><img src='../../../rust-logo.png' alt='logo'></div></a><div class="sidebar-elems"><p class='location'><a href='../../index.html'>sunrise_kernel</a>::<wbr><a href='../index.html'>i386</a>::<wbr><a href='index.html'>process_switch</a></p><script>window.sidebarCurrent = {name: 'process_switch', ty: 'fn', relpath: ''};</script><script defer src="sidebar-items.js"></script></div></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!"><img src="../../../brush.svg" width="18" alt="Pick another theme!"></button><div id="theme-choices"></div></div><script src="../../../theme.js"></script><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><a id="settings-menu" href="../../../settings.html"><img src="../../../wheel.svg" width="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><h1 class='fqn'><span class='out-of-band'><span id='render-detail'><a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class='inner'>&#x2212;</span>]</a></span><a class='srclink' href='../../../src/sunrise_kernel/i386/process_switch.rs.html#89-205' title='goto source code'>[src]</a></span><span class='in-band'>Function <a href='../../index.html'>sunrise_kernel</a>::<wbr><a href='../index.html'>i386</a>::<wbr><a href='index.html'>process_switch</a>::<wbr><a class="fn" href=''>process_switch</a></span></h1><pre class='rust fn'>pub unsafe extern &quot;C&quot; fn process_switch(<br>&nbsp;&nbsp;&nbsp;&nbsp;thread_b: <a class="struct" href="https://doc.rust-lang.org/nightly/alloc/sync/struct.Arc.html" title="struct alloc::sync::Arc">Arc</a>&lt;<a class="struct" href="../../../sunrise_kernel/process/struct.ThreadStruct.html" title="struct sunrise_kernel::process::ThreadStruct">ThreadStruct</a>&gt;, <br>&nbsp;&nbsp;&nbsp;&nbsp;thread_current: <a class="struct" href="https://doc.rust-lang.org/nightly/alloc/sync/struct.Arc.html" title="struct alloc::sync::Arc">Arc</a>&lt;<a class="struct" href="../../../sunrise_kernel/process/struct.ThreadStruct.html" title="struct sunrise_kernel::process::ThreadStruct">ThreadStruct</a>&gt;<br>) -&gt; <a class="struct" href="https://doc.rust-lang.org/nightly/alloc/sync/struct.Arc.html" title="struct alloc::sync::Arc">Arc</a>&lt;<a class="struct" href="../../../sunrise_kernel/process/struct.ThreadStruct.html" title="struct sunrise_kernel::process::ThreadStruct">ThreadStruct</a>&gt;</pre><div class='docblock'><p>Performs the process switch, switching from currently running process A, to process B.</p>
+<p>The process switch is composed of two parts :</p>
+<ul>
+<li>The &quot;schedule out&quot; part, where A takes care of saving its registers, prepares itself to be left,
+and performs the switch by loading B's registers.
+A is now stopped and waiting to be scheduled in again.</li>
+<li>The &quot;schedule in&quot; part, where B which was previously scheduled out by another process switch,
+now restores the registers it had saved on the stack, finalises the switch,
+and resumes its previous activity.</li>
+</ul>
+<h3 id="schedule-out" class="section-header"><a href="#schedule-out">Schedule out:</a></h3>
+<p>The schedule-out code performs the following steps:</p>
+<ol>
+<li>change A's state from Running to Scheduled</li>
+<li>change B's state from Scheduled to Running</li>
+<li>switch to using B's memory space. KernelLand of A is copied to B at this point.</li>
+<li>save registers of A on its stack</li>
+<li>save special &quot;hardware_context&quot; registers of A in its ProcessStruct.
+This is only the register containing the pointer to the top of the stack
+where all other registers are saved.</li>
+<li>load B's special hardware_contexts registers.
+This is where the process switch actually happens. Now we are running on B's stack,
+and Program Counter was moved to B's schedule-in routine</li>
+</ol>
+<h3 id="schedule-in" class="section-header"><a href="#schedule-in">Schedule in:</a></h3>
+<ol>
+<li>restore the registers that it had saved on the stack</li>
+<li>return to what it was doing before</li>
+</ol>
+<h3 id="switching-to-a-fresh-process" class="section-header"><a href="#switching-to-a-fresh-process">Switching to a fresh process:</a></h3>
+<p>In the special case where B is a newly born process, and it's its first time being scheduled (Owww, so cute),
+it hasn't been scheduled out before, and doesn't have anything on the stack yet.
+We choose to use the same schedule-in method for both cases, that means the schedule-in will
+expect the new process to have a bunch of values on the stack that will be pop'ed into registers,
+and finally ret' to a saved program counter on the stack.
+This program counter can be used to control where the process will end-up on it's first schedule,
+likely just a function that will jump straight to userspace.</p>
+<p>The stack can be prepared for schedule-in by the function prepare_for_first_schedule().</p>
+<h1 id="return" class="section-header"><a href="#return">Return</a></h1>
+<p>Returns an Arc to the current ProcessSwitch after the switch, which was passed on during the switch.</p>
+<h1 id="panics" class="section-header"><a href="#panics">Panics</a></h1>
+<p>Panics if the locks protecting the ProcessStruct of current or B process cannot be obtained.
+Panics if the locks protecting the MAIN_TASK TSS or DOUBLE_FAULT_TSS cannot be obtained.</p>
+<h1 id="safety" class="section-header"><a href="#safety">Safety</a></h1>
+<p>Interrupts definitely must be masked when calling this function</p>
+</div></section><section id="search" class="content hidden"></section><section class="footer"></section><script>window.rootPath = "../../../";window.currentCrate = "sunrise_kernel";</script><script src="../../../main.js"></script><script defer src="../../../search-index.js"></script></body></html>

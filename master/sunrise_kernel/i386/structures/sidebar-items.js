@@ -1,0 +1,1 @@
+initSidebarItems({"mod":[["gdt","Types for the Global Descriptor Table and segment selectors."],["idt","Provides types for the Interrupt Descriptor Table and its entries."]]});

@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["DirectoryFilterPredicate","Predicate helper used to filter directory entries."],["DirectoryInterface","A libfat directory reader implementing `DirectoryOperations`."]]});

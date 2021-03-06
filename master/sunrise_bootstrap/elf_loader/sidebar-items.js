@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["load_kernel","Loads the kernel in high memory Returns address of entry point"],["load_segment","Loads an elf segment by coping file_size bytes to the right address, and filling remaining with 0s. This is used by NOBITS sections (.bss), this way we initialize them to 0."]]});

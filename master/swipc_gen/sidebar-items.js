@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["generate_ipc","Generate a module containing all the functions in the given IPC file."]],"mod":[["gen_rust_code","Code generation implementation"],["itemmod","Mod parser"]]});

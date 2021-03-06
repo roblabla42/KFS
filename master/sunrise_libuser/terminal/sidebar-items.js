@@ -1,0 +1,1 @@
+initSidebarItems({"enum":[["WindowSize","Window creation requested size."]],"struct":[["Terminal","A struct for logging text to the window."]]});

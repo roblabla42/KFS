@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["Color","A rgb color"],["Window","A managed window."]]});

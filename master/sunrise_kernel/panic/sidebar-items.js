@@ -1,0 +1,1 @@
+initSidebarItems({"enum":[["PanicOrigin","Reason for a kernel panic. Must be passed to [kernel_panic]."]],"fn":[["display_bsod","Display the infamous \"Blue Screen Of Death\""],["kernel_panic","The kernel panic function."]],"static":[["BSOD_BMP","The \"Blue Screen Of Death\""]]});

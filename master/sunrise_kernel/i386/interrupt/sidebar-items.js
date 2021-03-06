@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["acknowledge","Acknowledge the given IRQ."],["init","Initialize the interrupt handler."],["isa_to_ioapic_irq","Gets the IOAPIC pin associated with an ISA (i8259) IRQ."],["unmask","Unmasks the given IRQ."]],"static":[["INTERRUPT_HANDLER","Global state for the interrupt handler."]],"struct":[["InterruptHandler","Global state for the interrupt handler."]]});

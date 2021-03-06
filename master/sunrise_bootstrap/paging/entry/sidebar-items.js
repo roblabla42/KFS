@@ -1,0 +1,1 @@
+initSidebarItems({"constant":[["ENTRY_PHYS_ADDRESS_MASK",""]],"enum":[["PageState","Represent the current state of this Page Table Entry: It can either be:"]],"struct":[["Entry","An entry in a page table or page directory. An unused entry is 0"],["EntryFlags","The flags of a table entry"]]});

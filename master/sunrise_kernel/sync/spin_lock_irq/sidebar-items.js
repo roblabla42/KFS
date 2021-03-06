@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["permanently_disable_interrupts","Permanently disables the interrupts. Forever."]],"struct":[["SpinLockIRQ","SpinLock that disables IRQ."],["SpinLockIRQGuard","The SpinLockIrq lock guard."]]});

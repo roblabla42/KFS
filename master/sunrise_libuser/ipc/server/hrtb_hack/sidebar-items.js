@@ -1,0 +1,1 @@
+initSidebarItems({"trait":[["FutureCallback","A similar trait to FnMut() but moving the Ret associated trait to a generic position, simplifying stuff. See module docs."]]});

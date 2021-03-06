@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["main","Adds a new user to /etc/passwd with the specified username."]],"static":[["HELP","Help string."]]});

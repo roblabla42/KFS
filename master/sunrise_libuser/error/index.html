@@ -1,0 +1,45 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="API documentation for the Rust `error` mod in crate `sunrise_libuser`."><meta name="keywords" content="rust, rustlang, rust-lang, error"><title>sunrise_libuser::error - Rust</title><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../dark.css"><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script src="../../storage.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="shortcut icon" href="../../favicon.ico"><style type="text/css">#crate-search{background-image:url("../../down-arrow.svg");}</style></head><body class="rustdoc mod"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu">&#9776;</div><a href='../../sunrise_libuser/index.html'><div class='logo-container'><img src='../../rust-logo.png' alt='logo'></div></a><p class='location'>Module error</p><div class="sidebar-elems"><div class="block items"><ul><li><a href="#structs">Structs</a></li><li><a href="#enums">Enums</a></li></ul></div><p class='location'><a href='../index.html'>sunrise_libuser</a></p><script>window.sidebarCurrent = {name: 'error', ty: 'mod', relpath: '../'};</script><script defer src="../sidebar-items.js"></script></div></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!"><img src="../../brush.svg" width="18" alt="Pick another theme!"></button><div id="theme-choices"></div></div><script src="../../theme.js"></script><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><a id="settings-menu" href="../../settings.html"><img src="../../wheel.svg" width="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><h1 class='fqn'><span class='out-of-band'><span id='render-detail'><a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class='inner'>&#x2212;</span>]</a></span><a class='srclink' href='../../src/sunrise_libuser/error.rs.html#1-404' title='goto source code'>[src]</a></span><span class='in-band'>Module <a href='../index.html'>sunrise_libuser</a>::<wbr><a class="mod" href=''>error</a></span></h1><div class='docblock'><p>Error handling</p>
+<p>Errors in Horizon/NX follow a specific format. They are encoded on a 32-bit
+integer, where the bottom 9 bits represent the module, while the top bits
+represent the &quot;description&quot;. A Module is usually a sysmodule, with a few
+additional modules for specific libraries (Module 168 is userland crash, for
+instance). See the <a href="https://switchbrew.org/w/index.php?title=Error_codes">switchbrew Error Codes page</a> for more information.</p>
+<p>Such errors are nice, but have one small problem: they're missing backtraces.
+In libuser, we opted to use a failure enum. We have a different enum for
+every module, listing all of their error descriptions, and a big enum
+over all those module errors. This fine-grained approach makes error handling
+code nicer. For instance, writing a function returning an Error:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered">
+<span class="kw">use</span> <span class="ident">sunrise_libuser</span>::<span class="ident">error</span>::{<span class="ident">KernelError</span>, <span class="ident">SmError</span>, <span class="ident">Error</span>};
+<span class="kw">fn</span> <span class="ident">ret_err</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident">Error</span><span class="op">&gt;</span> {
+   <span class="comment">// Will automatically be converted to Error, the backtrace filled</span>
+   <span class="kw">let</span> <span class="kw">_</span> <span class="op">=</span> <span class="prelude-val">Err</span>(<span class="ident">KernelError</span>::<span class="ident">PortRemoteDead</span>)<span class="question-mark">?</span>;
+   <span class="kw">let</span> <span class="kw">_</span> <span class="op">=</span> <span class="prelude-val">Err</span>(<span class="ident">SmError</span>::<span class="ident">PermissionDenied</span>)<span class="question-mark">?</span>;
+   <span class="prelude-val">Ok</span>(())
+}</pre></div>
+<p>Matching on an error is similarly convenient:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered">
+<span class="kw">use</span> <span class="ident">sunrise_libuser</span>::<span class="ident">error</span>::{<span class="ident">KernelError</span>, <span class="ident">Error</span>};
+<span class="kw">match</span> <span class="ident">err</span> {
+   <span class="prelude-val">Ok</span>(<span class="kw">_</span>) <span class="op">=</span><span class="op">&gt;</span> (),
+   <span class="prelude-val">Err</span>(<span class="ident">Error</span>::<span class="ident">Kernel</span>(<span class="ident">KernelError</span>::<span class="ident">PortRemoteDead</span>, <span class="kw">_</span>)) <span class="op">=</span><span class="op">&gt;</span> (),
+   <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> ()
+}</pre></div>
+</div><h2 id='structs' class='section-header'><a href="#structs">Structs</a></h2>
+<table><tr class='module-item'><td><a class="struct" href="struct.AhciError.html" title='sunrise_libuser::error::AhciError struct'>AhciError</a></td><td class='docblock-short'><p>AHCI driver errors.</p>
+</td></tr><tr class='module-item'><td><a class="struct" href="struct.FileSystemError.html" title='sunrise_libuser::error::FileSystemError struct'>FileSystemError</a></td><td class='docblock-short'><p>FileSystem driver errors.</p>
+</td></tr><tr class='module-item'><td><a class="struct" href="struct.HidError.html" title='sunrise_libuser::error::HidError struct'>HidError</a></td><td class='docblock-short'><p>HID driver errors.</p>
+</td></tr><tr class='module-item'><td><a class="struct" href="struct.KernelError.html" title='sunrise_libuser::error::KernelError struct'>KernelError</a></td><td class='docblock-short'><p>Kernel syscall error codes.</p>
+</td></tr><tr class='module-item'><td><a class="struct" href="struct.LibuserError.html" title='sunrise_libuser::error::LibuserError struct'>LibuserError</a></td><td class='docblock-short'><p>Internal libuser errors.</p>
+</td></tr><tr class='module-item'><td><a class="struct" href="struct.LoaderError.html" title='sunrise_libuser::error::LoaderError struct'>LoaderError</a></td><td class='docblock-short'><p>Loader errors.</p>
+</td></tr><tr class='module-item'><td><a class="struct" href="struct.Module.html" title='sunrise_libuser::error::Module struct'>Module</a></td><td class='docblock-short'></td></tr><tr class='module-item'><td><a class="struct" href="struct.PmError.html" title='sunrise_libuser::error::PmError struct'>PmError</a></td><td class='docblock-short'><p>PM Errors.</p>
+</td></tr><tr class='module-item'><td><a class="struct" href="struct.SmError.html" title='sunrise_libuser::error::SmError struct'>SmError</a></td><td class='docblock-short'><p>Service Manager errors.</p>
+</td></tr><tr class='module-item'><td><a class="struct" href="struct.TimeError.html" title='sunrise_libuser::error::TimeError struct'>TimeError</a></td><td class='docblock-short'><p>Time errors.</p>
+</td></tr><tr class='module-item'><td><a class="struct" href="struct.TwiliError.html" title='sunrise_libuser::error::TwiliError struct'>TwiliError</a></td><td class='docblock-short'><p>Twili Pipe errors.</p>
+</td></tr><tr class='module-item'><td><a class="struct" href="struct.ViError.html" title='sunrise_libuser::error::ViError struct'>ViError</a></td><td class='docblock-short'><p>Vi driver errors.</p>
+</td></tr></table><h2 id='enums' class='section-header'><a href="#enums">Enums</a></h2>
+<table><tr class='module-item'><td><a class="enum" href="enum.Error.html" title='sunrise_libuser::error::Error enum'>Error</a></td><td class='docblock-short'><p>The global error type. Every error defined here can be downcasted to this
+type. A Backtrace will be created when casting an error to this type.</p>
+</td></tr></table></section><section id="search" class="content hidden"></section><section class="footer"></section><script>window.rootPath = "../../";window.currentCrate = "sunrise_libuser";</script><script src="../../main.js"></script><script defer src="../../search-index.js"></script></body></html>

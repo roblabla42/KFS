@@ -1,0 +1,75 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="API documentation for the Rust `sync` mod in crate `sunrise_kernel`."><meta name="keywords" content="rust, rustlang, rust-lang, sync"><title>sunrise_kernel::sync - Rust</title><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../dark.css"><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script src="../../storage.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="shortcut icon" href="../../favicon.ico"><style type="text/css">#crate-search{background-image:url("../../down-arrow.svg");}</style></head><body class="rustdoc mod"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu">&#9776;</div><a href='../../sunrise_kernel/index.html'><div class='logo-container'><img src='../../rust-logo.png' alt='logo'></div></a><p class='location'>Module sync</p><div class="sidebar-elems"><div class="block items"><ul><li><a href="#reexports">Re-exports</a></li><li><a href="#modules">Modules</a></li><li><a href="#structs">Structs</a></li><li><a href="#statics">Statics</a></li><li><a href="#traits">Traits</a></li></ul></div><p class='location'><a href='../index.html'>sunrise_kernel</a></p><script>window.sidebarCurrent = {name: 'sync', ty: 'mod', relpath: '../'};</script><script defer src="../sidebar-items.js"></script></div></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!"><img src="../../brush.svg" width="18" alt="Pick another theme!"></button><div id="theme-choices"></div></div><script src="../../theme.js"></script><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><a id="settings-menu" href="../../settings.html"><img src="../../wheel.svg" width="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><h1 class='fqn'><span class='out-of-band'><span id='render-detail'><a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class='inner'>&#x2212;</span>]</a></span><a class='srclink' href='../../src/sunrise_kernel/sync/mod.rs.html#1-142' title='goto source code'>[src]</a></span><span class='in-band'>Module <a href='../index.html'>sunrise_kernel</a>::<wbr><a class="mod" href=''>sync</a></span></h1><div class='docblock'><p>Synchronization primitives used by the kernel</p>
+<p>In Sunrise kernel we provide different families of locks, that differ on their strategy when
+the lock cannot be obtained immediately, and how they deal with IRQs when the lock is held.</p>
+<h1 id="spin-locks" class="section-header"><a href="#spin-locks">spin locks</a></h1>
+<p><a href="../../sunrise_kernel/sync/spin_lock/struct.SpinLock.html">SpinLock</a>, <a href="../../sunrise_kernel/sync/struct.SpinRwLock.html">SpinRwLock</a>, and <a href="../../sunrise_kernel/sync/struct.Once.html">Once</a> are just dumb busy-loop locks.
+When calling <code>lock</code>, they will check if the lock is available and return, and otherwise busy-loop
+until it is available.</p>
+<p>These are just the types provided by the spin crate, renamed to reduce ambiguities.</p>
+<p>Because they are blocking and non-preemptive, they can't be used for long exclusive tasks without
+badly hurting performance for waiters.
+However they fit really well for really short tasks, where preempting would cause too much overhead,
+and because they're so dumb, they can be used pretty much everywhere, especially where
+preempting is not possible, as in the scheduler itself, or during early boot.</p>
+<h3 id="deadlock-avoidance" class="section-header"><a href="#deadlock-avoidance">Deadlock avoidance</a></h3>
+<p>Those lock are guaranteed to never deadlock, as long you don't:</p>
+<ol>
+<li>Preempt while holding the lock.
+E.g.: On a single core, kernel thread A takes the lock, preempts to thread B, tries to take
+the lock again: that's a deadlock.</li>
+<li>Try to use the lock both in regular context and interrupt context.
+E.g.: On a single core, kernel thread A takes the lock, is interrupted,
+IRQ handler tries to take the lock: that's a deadlock.</li>
+</ol>
+<p>Note that you <em>can</em> in theory use SpinLocks in interrupt context, as long as you don't
+try to access it in regular context. This would be useful on multi-core systems to arbitrate
+access to a resource when two IRQs are run concurrently.
+But we highly discourage it, as we see no use case for a resource that would be accessed <em>only</em>
+in interrupt context. So, our implementation panics when locked in interrupt context.</p>
+<h1 id="spinlockirq" class="section-header"><a href="#spinlockirq">SpinLockIRQ</a></h1>
+<p><a href="../../sunrise_kernel/sync/spin_lock_irq/struct.SpinLockIRQ.html">SpinLockIRQ</a> is a variation of SpinLock, which lifts the restriction on interrupt context access.</p>
+<p>It still is basically is busy-loop in its essence, but also disables all interrupts on the current core
+when the lock is held.</p>
+<p>It fits the same use cases as SpinLock, but because it cannot be interrupted while the lock is
+held, it can be used to access a resource both in regular and interrupt context.</p>
+<h3 id="deadlock-avoidance-1" class="section-header"><a href="#deadlock-avoidance-1">Deadlock avoidance</a></h3>
+<p>Similar to SpinLock, this lock is guaranteed to never deadlock, as long you don't:</p>
+<ol>
+<li>Preempt while holding the lock.
+E.g.: On a single core, kernel thread A takes the lock, preempts to thread B, tries to take
+the lock again: that's a deadlock.</li>
+</ol>
+<h3 id="as-a-interrupt-disabler" class="section-header"><a href="#as-a-interrupt-disabler">As a interrupt disabler</a></h3>
+<p>A side-effect of SpinLockIRQs, is that it disables all IRQs for as long as it is held.
+They often are used in the kernel for this sole purpose.</p>
+<p>If you create a SpinLockIRQ and wrap no type, i.e. <code>SpinLockIRQ&lt;()&gt;</code>, you can control whether
+interrupts are enabled/disabled simply by locking it and unlocking it.</p>
+<h1 id="mutex" class="section-header"><a href="#mutex">Mutex</a></h1>
+<p><a href="../../sunrise_kernel/sync/mutex/struct.Mutex.html">Mutex</a> is a lock that preempts when it cannot be obtained. Those are the locks you are expected
+to use when you have to do some long exclusive tasks.</p>
+<p>However since it uses the scheduler, it cannot be used in early boot.</p>
+<h3 id="deadlock-avoidance-2" class="section-header"><a href="#deadlock-avoidance-2">Deadlock avoidance</a></h3>
+<p>Those locks are illegal for interrupt context.</p>
+<p>However, for every other use case they a lot less constrained compared to SpinLocks.
+But since they aren't recursive, you still can't lock one while holding it.</p>
+<p>You <em>can</em> preempt while holding such a lock, as long as the scheduler's code doesn't also use it
+for itself, but this would seem like a bad idea.</p>
+</div><h2 id='reexports' class='section-header'><a href="#reexports">Re-exports</a></h2>
+<table><tr><td><code>pub use self::spin_lock_irq::<a class="struct" href="../../sunrise_kernel/sync/spin_lock_irq/struct.SpinLockIRQ.html" title="struct sunrise_kernel::sync::spin_lock_irq::SpinLockIRQ">SpinLockIRQ</a>;</code></td></tr><tr><td><code>pub use self::spin_lock_irq::<a class="struct" href="../../sunrise_kernel/sync/spin_lock_irq/struct.SpinLockIRQGuard.html" title="struct sunrise_kernel::sync::spin_lock_irq::SpinLockIRQGuard">SpinLockIRQGuard</a>;</code></td></tr><tr><td><code>pub use self::spin_lock::<a class="struct" href="../../sunrise_kernel/sync/spin_lock/struct.SpinLock.html" title="struct sunrise_kernel::sync::spin_lock::SpinLock">SpinLock</a>;</code></td></tr><tr><td><code>pub use self::mutex::<a class="struct" href="../../sunrise_kernel/sync/mutex/struct.Mutex.html" title="struct sunrise_kernel::sync::mutex::Mutex">Mutex</a>;</code></td></tr><tr><td><code>pub use self::mutex::<a class="struct" href="../../sunrise_kernel/sync/mutex/struct.MutexGuard.html" title="struct sunrise_kernel::sync::mutex::MutexGuard">MutexGuard</a>;</code></td></tr></table><h2 id='modules' class='section-header'><a href="#modules">Modules</a></h2>
+<table><tr class='module-item'><td><a class="mod" href="mutex/index.html" title='sunrise_kernel::sync::mutex mod'>mutex</a></td><td class='docblock-short'><p>Preemptive Mutex</p>
+</td></tr><tr class='module-item'><td><a class="mod" href="spin_lock/index.html" title='sunrise_kernel::sync::spin_lock mod'>spin_lock</a></td><td class='docblock-short'><p>Lock that panics when used in a IRQ context</p>
+</td></tr><tr class='module-item'><td><a class="mod" href="spin_lock_irq/index.html" title='sunrise_kernel::sync::spin_lock_irq mod'>spin_lock_irq</a></td><td class='docblock-short'><p>Lock disabling IRQs while held</p>
+</td></tr></table><h2 id='structs' class='section-header'><a href="#structs">Structs</a></h2>
+<table><tr class='module-item'><td><a class="struct" href="struct.Once.html" title='sunrise_kernel::sync::Once struct'>Once</a></td><td class='docblock-short'><p>A synchronization primitive which can be used to run a one-time global
+initialization. Unlike its std equivalent, this is generalized so that the
+closure returns a value and it is stored. Once therefore acts something like
+a future, too.</p>
+</td></tr><tr class='module-item'><td><a class="struct" href="struct.SpinLockGuard.html" title='sunrise_kernel::sync::SpinLockGuard struct'>SpinLockGuard</a></td><td class='docblock-short'><p>A guard to which the protected data can be accessed</p>
+</td></tr><tr class='module-item'><td><a class="struct" href="struct.SpinRwLock.html" title='sunrise_kernel::sync::SpinRwLock struct'>SpinRwLock</a></td><td class='docblock-short'><p>A reader-writer lock</p>
+</td></tr><tr class='module-item'><td><a class="struct" href="struct.SpinRwLockReadGuard.html" title='sunrise_kernel::sync::SpinRwLockReadGuard struct'>SpinRwLockReadGuard</a></td><td class='docblock-short'><p>A guard from which the protected data can be read</p>
+</td></tr><tr class='module-item'><td><a class="struct" href="struct.SpinRwLockWriteGuard.html" title='sunrise_kernel::sync::SpinRwLockWriteGuard struct'>SpinRwLockWriteGuard</a></td><td class='docblock-short'><p>A guard to which the protected data can be written</p>
+</td></tr></table><h2 id='statics' class='section-header'><a href="#statics">Statics</a></h2>
+<table><tr class='module-item'><td><a class="static" href="static.INTERRUPT_DISARM.html" title='sunrise_kernel::sync::INTERRUPT_DISARM static'>INTERRUPT_DISARM</a></td><td class='docblock-short'><p>Boolean to <a href="../../sunrise_kernel/sync/spin_lock_irq/fn.permanently_disable_interrupts.html" title="spin_lock_irq::permanently_disable_interrupts">spin_lock_irq::permanently_disable_interrupts</a>.</p>
+</td></tr></table><h2 id='traits' class='section-header'><a href="#traits">Traits</a></h2>
+<table><tr class='module-item'><td><a class="trait" href="trait.Lock.html" title='sunrise_kernel::sync::Lock trait'>Lock</a></td><td class='docblock-short'><p>Abstraction around various kind of locks.</p>
+</td></tr></table></section><section id="search" class="content hidden"></section><section class="footer"></section><script>window.rootPath = "../../";window.currentCrate = "sunrise_kernel";</script><script src="../../main.js"></script><script defer src="../../search-index.js"></script></body></html>

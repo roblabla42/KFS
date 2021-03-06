@@ -1,0 +1,42 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="API documentation for the Rust `wait_synchronization` fn in crate `sunrise_libuser`."><meta name="keywords" content="rust, rustlang, rust-lang, wait_synchronization"><title>sunrise_libuser::syscalls::wait_synchronization - Rust</title><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../dark.css"><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script src="../../storage.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="shortcut icon" href="../../favicon.ico"><style type="text/css">#crate-search{background-image:url("../../down-arrow.svg");}</style></head><body class="rustdoc fn"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu">&#9776;</div><a href='../../sunrise_libuser/index.html'><div class='logo-container'><img src='../../rust-logo.png' alt='logo'></div></a><div class="sidebar-elems"><p class='location'><a href='../index.html'>sunrise_libuser</a>::<wbr><a href='index.html'>syscalls</a></p><script>window.sidebarCurrent = {name: 'wait_synchronization', ty: 'fn', relpath: ''};</script><script defer src="sidebar-items.js"></script></div></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!"><img src="../../brush.svg" width="18" alt="Pick another theme!"></button><div id="theme-choices"></div></div><script src="../../theme.js"></script><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><a id="settings-menu" href="../../settings.html"><img src="../../wheel.svg" width="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><h1 class='fqn'><span class='out-of-band'><span id='render-detail'><a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class='inner'>&#x2212;</span>]</a></span><a class='srclink' href='../../src/sunrise_libuser/syscalls.rs.html#329-334' title='goto source code'>[src]</a></span><span class='in-band'>Function <a href='../index.html'>sunrise_libuser</a>::<wbr><a href='index.html'>syscalls</a>::<wbr><a class="fn" href=''>wait_synchronization</a></span></h1><pre class='rust fn'>pub fn wait_synchronization(<br>&nbsp;&nbsp;&nbsp;&nbsp;handles: <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.slice.html">&amp;[</a><a class="struct" href="../../sunrise_libuser/types/struct.HandleRef.html" title="struct sunrise_libuser::types::HandleRef">HandleRef</a><a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.slice.html">]</a>, <br>&nbsp;&nbsp;&nbsp;&nbsp;timeout_ns: <a class="enum" href="https://doc.rust-lang.org/nightly/core/option/enum.Option.html" title="enum core::option::Option">Option</a>&lt;<a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.usize.html">usize</a>&gt;<br>) -&gt; <a class="enum" href="https://doc.rust-lang.org/nightly/core/result/enum.Result.html" title="enum core::result::Result">Result</a>&lt;<a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.usize.html">usize</a>, <a class="struct" href="../../sunrise_libuser/error/struct.KernelError.html" title="struct sunrise_libuser::error::KernelError">KernelError</a>&gt;</pre><div class='docblock'><p>Wait for an event on the given handles.</p>
+<p>When zero handles are passed, this will wait forever until either timeout or
+cancellation occurs.</p>
+<p>If a timeout of 0 is passed, this function is guaranteed not to reschedule.</p>
+<p>Does not accept 0xFFFF8001 or 0xFFFF8000 meta-handles.</p>
+<h1 id="object-types" class="section-header"><a href="#object-types">Object types</a></h1>
+<ul>
+<li>KDebug: signals when there is a new DebugEvent (retrievable via
+GetDebugEvent).</li>
+<li>KClientPort: signals when the number of sessions is less than the maximum
+allowed.</li>
+<li>KProcess: signals when the process undergoes a state change (retrievable
+via #svcGetProcessInfo).</li>
+<li>KReadableEvent: signals when the event's corresponding KWritableEvent has
+been signaled via svcSignalEvent.</li>
+<li>KServerPort: signals when there is an incoming connection waiting to be
+accepted.</li>
+<li>KServerSession: signals when there is an incoming message waiting to be
+received or the pipe is closed.</li>
+<li>KThread: signals when the thread has exited.</li>
+</ul>
+<h1 id="result-codes" class="section-header"><a href="#result-codes">Result codes</a></h1>
+<ul>
+<li>0x0000: Success. One of the objects was signaled before the timeout
+expired, or one of the objects is a Session with a closed remote. Handle
+index is updated to indicate which object signaled.</li>
+<li>0x7601: Thread termination requested. Handle index is not updated. Cannot
+happen when timeout is 0.</li>
+<li>0xe401: Invalid handle. Returned when one of the handles passed is invalid.
+Handle index is not updated.</li>
+<li>0xe601: Invalid address. Returned when the handles pointer is not a
+readable address. Handle index is not updated.</li>
+<li>0xea01: Timeout. Returned when no objects have been signaled within the
+timeout. Handle index is not updated.</li>
+<li>0xec01: Interrupted. Returned when another thread uses
+svcCancelSynchronization to cancel this thread. Handle index is not
+updated. Cannot happen when timeout is 0.</li>
+<li>0xee01: Too many handles. Returned when the number of handles passed is
+&gt;0x40. Note: Sunrise kernel currently does not return this error. It is perfectly able
+to wait on more than 0x40 handles.</li>
+</ul>
+</div></section><section id="search" class="content hidden"></section><section class="footer"></section><script>window.rootPath = "../../";window.currentCrate = "sunrise_libuser";</script><script src="../../main.js"></script><script defer src="../../search-index.js"></script></body></html>

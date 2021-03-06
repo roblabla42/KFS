@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["SpinLock","This type provides mutual exclusion based on spinning. It will panic if used in the context of an interrupt."],["SpinLockGuard","A guard to which the protected data can be accessed"]]});

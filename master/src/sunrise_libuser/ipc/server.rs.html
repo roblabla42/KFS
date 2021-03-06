@@ -1,0 +1,992 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source to the Rust file `libuser/src/ipc/server.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>server.rs.html -- source</title><link rel="stylesheet" type="text/css" href="../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../dark.css"><link rel="stylesheet" type="text/css" href="../../../light.css" id="themeStyle"><script src="../../../storage.js"></script><noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="shortcut icon" href="../../../favicon.ico"><style type="text/css">#crate-search{background-image:url("../../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu">&#9776;</div><a href='../../../sunrise_libuser/index.html'><div class='logo-container'><img src='../../../rust-logo.png' alt='logo'></div></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!"><img src="../../../brush.svg" width="18" alt="Pick another theme!"></button><div id="theme-choices"></div></div><script src="../../../theme.js"></script><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><a id="settings-menu" href="../../../settings.html"><img src="../../../wheel.svg" width="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><pre class="line-numbers"><span id="1">  1</span>
+<span id="2">  2</span>
+<span id="3">  3</span>
+<span id="4">  4</span>
+<span id="5">  5</span>
+<span id="6">  6</span>
+<span id="7">  7</span>
+<span id="8">  8</span>
+<span id="9">  9</span>
+<span id="10"> 10</span>
+<span id="11"> 11</span>
+<span id="12"> 12</span>
+<span id="13"> 13</span>
+<span id="14"> 14</span>
+<span id="15"> 15</span>
+<span id="16"> 16</span>
+<span id="17"> 17</span>
+<span id="18"> 18</span>
+<span id="19"> 19</span>
+<span id="20"> 20</span>
+<span id="21"> 21</span>
+<span id="22"> 22</span>
+<span id="23"> 23</span>
+<span id="24"> 24</span>
+<span id="25"> 25</span>
+<span id="26"> 26</span>
+<span id="27"> 27</span>
+<span id="28"> 28</span>
+<span id="29"> 29</span>
+<span id="30"> 30</span>
+<span id="31"> 31</span>
+<span id="32"> 32</span>
+<span id="33"> 33</span>
+<span id="34"> 34</span>
+<span id="35"> 35</span>
+<span id="36"> 36</span>
+<span id="37"> 37</span>
+<span id="38"> 38</span>
+<span id="39"> 39</span>
+<span id="40"> 40</span>
+<span id="41"> 41</span>
+<span id="42"> 42</span>
+<span id="43"> 43</span>
+<span id="44"> 44</span>
+<span id="45"> 45</span>
+<span id="46"> 46</span>
+<span id="47"> 47</span>
+<span id="48"> 48</span>
+<span id="49"> 49</span>
+<span id="50"> 50</span>
+<span id="51"> 51</span>
+<span id="52"> 52</span>
+<span id="53"> 53</span>
+<span id="54"> 54</span>
+<span id="55"> 55</span>
+<span id="56"> 56</span>
+<span id="57"> 57</span>
+<span id="58"> 58</span>
+<span id="59"> 59</span>
+<span id="60"> 60</span>
+<span id="61"> 61</span>
+<span id="62"> 62</span>
+<span id="63"> 63</span>
+<span id="64"> 64</span>
+<span id="65"> 65</span>
+<span id="66"> 66</span>
+<span id="67"> 67</span>
+<span id="68"> 68</span>
+<span id="69"> 69</span>
+<span id="70"> 70</span>
+<span id="71"> 71</span>
+<span id="72"> 72</span>
+<span id="73"> 73</span>
+<span id="74"> 74</span>
+<span id="75"> 75</span>
+<span id="76"> 76</span>
+<span id="77"> 77</span>
+<span id="78"> 78</span>
+<span id="79"> 79</span>
+<span id="80"> 80</span>
+<span id="81"> 81</span>
+<span id="82"> 82</span>
+<span id="83"> 83</span>
+<span id="84"> 84</span>
+<span id="85"> 85</span>
+<span id="86"> 86</span>
+<span id="87"> 87</span>
+<span id="88"> 88</span>
+<span id="89"> 89</span>
+<span id="90"> 90</span>
+<span id="91"> 91</span>
+<span id="92"> 92</span>
+<span id="93"> 93</span>
+<span id="94"> 94</span>
+<span id="95"> 95</span>
+<span id="96"> 96</span>
+<span id="97"> 97</span>
+<span id="98"> 98</span>
+<span id="99"> 99</span>
+<span id="100">100</span>
+<span id="101">101</span>
+<span id="102">102</span>
+<span id="103">103</span>
+<span id="104">104</span>
+<span id="105">105</span>
+<span id="106">106</span>
+<span id="107">107</span>
+<span id="108">108</span>
+<span id="109">109</span>
+<span id="110">110</span>
+<span id="111">111</span>
+<span id="112">112</span>
+<span id="113">113</span>
+<span id="114">114</span>
+<span id="115">115</span>
+<span id="116">116</span>
+<span id="117">117</span>
+<span id="118">118</span>
+<span id="119">119</span>
+<span id="120">120</span>
+<span id="121">121</span>
+<span id="122">122</span>
+<span id="123">123</span>
+<span id="124">124</span>
+<span id="125">125</span>
+<span id="126">126</span>
+<span id="127">127</span>
+<span id="128">128</span>
+<span id="129">129</span>
+<span id="130">130</span>
+<span id="131">131</span>
+<span id="132">132</span>
+<span id="133">133</span>
+<span id="134">134</span>
+<span id="135">135</span>
+<span id="136">136</span>
+<span id="137">137</span>
+<span id="138">138</span>
+<span id="139">139</span>
+<span id="140">140</span>
+<span id="141">141</span>
+<span id="142">142</span>
+<span id="143">143</span>
+<span id="144">144</span>
+<span id="145">145</span>
+<span id="146">146</span>
+<span id="147">147</span>
+<span id="148">148</span>
+<span id="149">149</span>
+<span id="150">150</span>
+<span id="151">151</span>
+<span id="152">152</span>
+<span id="153">153</span>
+<span id="154">154</span>
+<span id="155">155</span>
+<span id="156">156</span>
+<span id="157">157</span>
+<span id="158">158</span>
+<span id="159">159</span>
+<span id="160">160</span>
+<span id="161">161</span>
+<span id="162">162</span>
+<span id="163">163</span>
+<span id="164">164</span>
+<span id="165">165</span>
+<span id="166">166</span>
+<span id="167">167</span>
+<span id="168">168</span>
+<span id="169">169</span>
+<span id="170">170</span>
+<span id="171">171</span>
+<span id="172">172</span>
+<span id="173">173</span>
+<span id="174">174</span>
+<span id="175">175</span>
+<span id="176">176</span>
+<span id="177">177</span>
+<span id="178">178</span>
+<span id="179">179</span>
+<span id="180">180</span>
+<span id="181">181</span>
+<span id="182">182</span>
+<span id="183">183</span>
+<span id="184">184</span>
+<span id="185">185</span>
+<span id="186">186</span>
+<span id="187">187</span>
+<span id="188">188</span>
+<span id="189">189</span>
+<span id="190">190</span>
+<span id="191">191</span>
+<span id="192">192</span>
+<span id="193">193</span>
+<span id="194">194</span>
+<span id="195">195</span>
+<span id="196">196</span>
+<span id="197">197</span>
+<span id="198">198</span>
+<span id="199">199</span>
+<span id="200">200</span>
+<span id="201">201</span>
+<span id="202">202</span>
+<span id="203">203</span>
+<span id="204">204</span>
+<span id="205">205</span>
+<span id="206">206</span>
+<span id="207">207</span>
+<span id="208">208</span>
+<span id="209">209</span>
+<span id="210">210</span>
+<span id="211">211</span>
+<span id="212">212</span>
+<span id="213">213</span>
+<span id="214">214</span>
+<span id="215">215</span>
+<span id="216">216</span>
+<span id="217">217</span>
+<span id="218">218</span>
+<span id="219">219</span>
+<span id="220">220</span>
+<span id="221">221</span>
+<span id="222">222</span>
+<span id="223">223</span>
+<span id="224">224</span>
+<span id="225">225</span>
+<span id="226">226</span>
+<span id="227">227</span>
+<span id="228">228</span>
+<span id="229">229</span>
+<span id="230">230</span>
+<span id="231">231</span>
+<span id="232">232</span>
+<span id="233">233</span>
+<span id="234">234</span>
+<span id="235">235</span>
+<span id="236">236</span>
+<span id="237">237</span>
+<span id="238">238</span>
+<span id="239">239</span>
+<span id="240">240</span>
+<span id="241">241</span>
+<span id="242">242</span>
+<span id="243">243</span>
+<span id="244">244</span>
+<span id="245">245</span>
+<span id="246">246</span>
+<span id="247">247</span>
+<span id="248">248</span>
+<span id="249">249</span>
+<span id="250">250</span>
+<span id="251">251</span>
+<span id="252">252</span>
+<span id="253">253</span>
+<span id="254">254</span>
+<span id="255">255</span>
+<span id="256">256</span>
+<span id="257">257</span>
+<span id="258">258</span>
+<span id="259">259</span>
+<span id="260">260</span>
+<span id="261">261</span>
+<span id="262">262</span>
+<span id="263">263</span>
+<span id="264">264</span>
+<span id="265">265</span>
+<span id="266">266</span>
+<span id="267">267</span>
+<span id="268">268</span>
+<span id="269">269</span>
+<span id="270">270</span>
+<span id="271">271</span>
+<span id="272">272</span>
+<span id="273">273</span>
+<span id="274">274</span>
+<span id="275">275</span>
+<span id="276">276</span>
+<span id="277">277</span>
+<span id="278">278</span>
+<span id="279">279</span>
+<span id="280">280</span>
+<span id="281">281</span>
+<span id="282">282</span>
+<span id="283">283</span>
+<span id="284">284</span>
+<span id="285">285</span>
+<span id="286">286</span>
+<span id="287">287</span>
+<span id="288">288</span>
+<span id="289">289</span>
+<span id="290">290</span>
+<span id="291">291</span>
+<span id="292">292</span>
+<span id="293">293</span>
+<span id="294">294</span>
+<span id="295">295</span>
+<span id="296">296</span>
+<span id="297">297</span>
+<span id="298">298</span>
+<span id="299">299</span>
+<span id="300">300</span>
+<span id="301">301</span>
+<span id="302">302</span>
+<span id="303">303</span>
+<span id="304">304</span>
+<span id="305">305</span>
+<span id="306">306</span>
+<span id="307">307</span>
+<span id="308">308</span>
+<span id="309">309</span>
+<span id="310">310</span>
+<span id="311">311</span>
+<span id="312">312</span>
+<span id="313">313</span>
+<span id="314">314</span>
+<span id="315">315</span>
+<span id="316">316</span>
+<span id="317">317</span>
+<span id="318">318</span>
+<span id="319">319</span>
+<span id="320">320</span>
+<span id="321">321</span>
+<span id="322">322</span>
+<span id="323">323</span>
+<span id="324">324</span>
+<span id="325">325</span>
+<span id="326">326</span>
+<span id="327">327</span>
+<span id="328">328</span>
+<span id="329">329</span>
+<span id="330">330</span>
+<span id="331">331</span>
+<span id="332">332</span>
+<span id="333">333</span>
+<span id="334">334</span>
+<span id="335">335</span>
+<span id="336">336</span>
+<span id="337">337</span>
+<span id="338">338</span>
+<span id="339">339</span>
+<span id="340">340</span>
+<span id="341">341</span>
+<span id="342">342</span>
+<span id="343">343</span>
+<span id="344">344</span>
+<span id="345">345</span>
+<span id="346">346</span>
+<span id="347">347</span>
+<span id="348">348</span>
+<span id="349">349</span>
+<span id="350">350</span>
+<span id="351">351</span>
+<span id="352">352</span>
+<span id="353">353</span>
+<span id="354">354</span>
+<span id="355">355</span>
+<span id="356">356</span>
+<span id="357">357</span>
+<span id="358">358</span>
+<span id="359">359</span>
+<span id="360">360</span>
+<span id="361">361</span>
+<span id="362">362</span>
+<span id="363">363</span>
+<span id="364">364</span>
+<span id="365">365</span>
+<span id="366">366</span>
+<span id="367">367</span>
+<span id="368">368</span>
+<span id="369">369</span>
+<span id="370">370</span>
+<span id="371">371</span>
+<span id="372">372</span>
+<span id="373">373</span>
+<span id="374">374</span>
+<span id="375">375</span>
+<span id="376">376</span>
+<span id="377">377</span>
+<span id="378">378</span>
+<span id="379">379</span>
+<span id="380">380</span>
+<span id="381">381</span>
+<span id="382">382</span>
+<span id="383">383</span>
+<span id="384">384</span>
+<span id="385">385</span>
+<span id="386">386</span>
+<span id="387">387</span>
+<span id="388">388</span>
+<span id="389">389</span>
+<span id="390">390</span>
+<span id="391">391</span>
+<span id="392">392</span>
+<span id="393">393</span>
+<span id="394">394</span>
+<span id="395">395</span>
+<span id="396">396</span>
+<span id="397">397</span>
+<span id="398">398</span>
+<span id="399">399</span>
+<span id="400">400</span>
+<span id="401">401</span>
+<span id="402">402</span>
+<span id="403">403</span>
+<span id="404">404</span>
+<span id="405">405</span>
+<span id="406">406</span>
+<span id="407">407</span>
+<span id="408">408</span>
+<span id="409">409</span>
+<span id="410">410</span>
+<span id="411">411</span>
+<span id="412">412</span>
+<span id="413">413</span>
+<span id="414">414</span>
+<span id="415">415</span>
+<span id="416">416</span>
+<span id="417">417</span>
+<span id="418">418</span>
+<span id="419">419</span>
+<span id="420">420</span>
+<span id="421">421</span>
+<span id="422">422</span>
+<span id="423">423</span>
+<span id="424">424</span>
+<span id="425">425</span>
+<span id="426">426</span>
+<span id="427">427</span>
+<span id="428">428</span>
+<span id="429">429</span>
+<span id="430">430</span>
+<span id="431">431</span>
+<span id="432">432</span>
+<span id="433">433</span>
+<span id="434">434</span>
+<span id="435">435</span>
+<span id="436">436</span>
+<span id="437">437</span>
+<span id="438">438</span>
+<span id="439">439</span>
+<span id="440">440</span>
+<span id="441">441</span>
+<span id="442">442</span>
+<span id="443">443</span>
+<span id="444">444</span>
+<span id="445">445</span>
+<span id="446">446</span>
+<span id="447">447</span>
+<span id="448">448</span>
+<span id="449">449</span>
+<span id="450">450</span>
+<span id="451">451</span>
+<span id="452">452</span>
+<span id="453">453</span>
+<span id="454">454</span>
+<span id="455">455</span>
+<span id="456">456</span>
+<span id="457">457</span>
+<span id="458">458</span>
+<span id="459">459</span>
+<span id="460">460</span>
+<span id="461">461</span>
+<span id="462">462</span>
+<span id="463">463</span>
+<span id="464">464</span>
+<span id="465">465</span>
+<span id="466">466</span>
+<span id="467">467</span>
+<span id="468">468</span>
+<span id="469">469</span>
+<span id="470">470</span>
+<span id="471">471</span>
+<span id="472">472</span>
+<span id="473">473</span>
+<span id="474">474</span>
+<span id="475">475</span>
+<span id="476">476</span>
+<span id="477">477</span>
+<span id="478">478</span>
+<span id="479">479</span>
+<span id="480">480</span>
+<span id="481">481</span>
+<span id="482">482</span>
+<span id="483">483</span>
+<span id="484">484</span>
+<span id="485">485</span>
+<span id="486">486</span>
+<span id="487">487</span>
+<span id="488">488</span>
+<span id="489">489</span>
+<span id="490">490</span>
+<span id="491">491</span>
+<span id="492">492</span>
+<span id="493">493</span>
+<span id="494">494</span>
+<span id="495">495</span>
+</pre><div class="example-wrap"><pre class="rust ">
+<span class="doccomment">//! # IPC Server primitives</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! The IPC System on horizon is made of Ports pair and Session pairs. Each pair</span>
+<span class="doccomment">//! has a client and a server side:</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! - For Ports, the client is used to connect, returning a client Session,</span>
+<span class="doccomment">//!   while the server is used to accept connections, returning a server Session</span>
+<span class="doccomment">//! - For Sessions, the client is used to send IPC requests, while the server</span>
+<span class="doccomment">//!   is used to receive and reply to those requests.</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! An IPC Server is made of a [future executor](crate::futures) on which we</span>
+<span class="doccomment">//! spawn futures to handle Port and Session. Those futures, created through</span>
+<span class="doccomment">//! [fn port_handler] and [fn new_session_wrapper], will take care of accepting</span>
+<span class="doccomment">//! new sessions from a ServerPort, and answering IPC requests sent on the</span>
+<span class="doccomment">//! ServerSession.</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! ## Port Handling</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! Most interfaces start with a Port, which is basically an object to which</span>
+<span class="doccomment">//! clients can connect to, creating a Session pair. Ports can come from two</span>
+<span class="doccomment">//! places: It can either be kernel-managed, or it can be sm-managed. Almost</span>
+<span class="doccomment">//! all ports are sm-managed, the only exceptions being `sm:` itself.</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! Kernel-managed ports are created through the [fn managed_port_handler]</span>
+<span class="doccomment">//! function. This will internally call [crate::syscalls::manage_named_port()]</span>
+<span class="doccomment">//! to acquire a [crate::types::ServerPort]. Sm-managed ports are created</span>
+<span class="doccomment">//! through [fn port_handler], which call</span>
+<span class="doccomment">//! [crate::sm::IUserInterfaceProxy::register_service()] to acquire their</span>
+<span class="doccomment">//! ServerPort.</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! Once the ServerPort is acquired, the port handling functions will run on a</span>
+<span class="doccomment">//! loop, accepting new connections, creating a backing Object for the sessions,</span>
+<span class="doccomment">//! and spawning a new future on the event loop with [fn new_session_wrapper].</span>
+<span class="doccomment">//!</span>
+<span class="comment">// no_run because port_handler will fail on linux.</span>
+<span class="doccomment">//! ```no_run</span>
+<span class="doccomment">//! # extern crate alloc;</span>
+<span class="doccomment">//! use alloc::boxed::Box;</span>
+<span class="doccomment">//! use sunrise_libuser::futures::WaitableManager;</span>
+<span class="doccomment">//! use sunrise_libuser::futures_rs::future::FutureObj;</span>
+<span class="doccomment">//! use sunrise_libuser::ipc::server::port_handler;</span>
+<span class="doccomment">//! use sunrise_libuser::example::IExample1;</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! /// Every time the port accepts a connection and a session is created, it</span>
+<span class="doccomment">//! /// will spawn a HelloInterface.</span>
+<span class="doccomment">//! #[derive(Debug, Default, Clone)]</span>
+<span class="doccomment">//! struct HelloInterface;</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! impl IExample1 for HelloInterface {}</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! fn main() {</span>
+<span class="doccomment">//!     let mut man = WaitableManager::new();</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//!     let handler = port_handler(man.work_queue(), &quot;hello&quot;, HelloInterface::dispatch).unwrap();</span>
+<span class="doccomment">//!     man.work_queue().spawn(FutureObj::new(Box::new(handler)));</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! #   let man = FakeMan;</span>
+<span class="doccomment">//!     man.run();</span>
+<span class="doccomment">//! }</span>
+<span class="doccomment">//! # // We can&#39;t run the WaitableManager, since that&#39;ll attempt to run syscalls</span>
+<span class="doccomment">//! # // that aren&#39;t implemented.</span>
+<span class="doccomment">//! # struct FakeMan;</span>
+<span class="doccomment">//! # impl FakeMan { fn run(&amp;self) {} }</span>
+<span class="doccomment">//! ```</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! ## Session Handling</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! A Session server is represented by an Object implementing an Interface,</span>
+<span class="doccomment">//! receiving and replying to Remote Process Call (RPC) requests on a</span>
+<span class="doccomment">//! [crate::types::ServerSession]. A session server is created either through a</span>
+<span class="doccomment">//! port handler accepting a session, or through the [fn new_session_wrapper]</span>
+<span class="doccomment">//! function, which will receive requests, call the Object&#39;s dispatcher</span>
+<span class="doccomment">//! function, and reply with the answer.</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! ### Interfaces</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! IPC Servers expose an API to a given service to other processes using an RPC</span>
+<span class="doccomment">//! interface. The interface is defined using a SwIPC id file which can be found</span>
+<span class="doccomment">//! in the `ipcdefs` folder at the root of the repository. This SwIPC file will</span>
+<span class="doccomment">//! then get compiled by swipc-gen into a rust file containing a Client struct</span>
+<span class="doccomment">//! and two Server traits (one being synchronous, the other asynchronous). Those</span>
+<span class="doccomment">//! will generally be exposed from the `sunrise_libuser` crate.</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! Those traits contain two elements:</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! 1. A function for every function in the SwIPC interface, having roughly the</span>
+<span class="doccomment">//!    same signature (but with SwIPC types translated to rust). The user is</span>
+<span class="doccomment">//!    expected to implement all those functions to have a complete interface</span>
+<span class="doccomment">//!    implementation.</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! 2. A function called `dispatch`. This function will be called by the Session</span>
+<span class="doccomment">//!    Wrapper, and is in charge of parsing the IPC message data to extract all</span>
+<span class="doccomment">//!    the arguments and call the correct function from the trait</span>
+<span class="doccomment">//!    implementation.</span>
+<span class="doccomment">//!</span>
+<span class="comment">// no_run because port_handler will fail on linux...</span>
+<span class="doccomment">//! ```no_run</span>
+<span class="doccomment">//! extern crate alloc;</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! use alloc::boxed::Box;</span>
+<span class="doccomment">//! use sunrise_libuser::futures::{WorkQueue, WaitableManager};</span>
+<span class="doccomment">//! use sunrise_libuser::futures_rs::future::FutureObj;</span>
+<span class="doccomment">//! use sunrise_libuser::ipc::server::port_handler;</span>
+<span class="doccomment">//! use sunrise_libuser::example::IExample2;</span>
+<span class="doccomment">//! use sunrise_libuser::error::Error;</span>
+<span class="doccomment">//! use log::*;</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! #[derive(Debug, Default, Clone)]</span>
+<span class="doccomment">//! struct HelloInterface;</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! impl IExample2 for HelloInterface {</span>
+<span class="doccomment">//!     fn function(&amp;mut self, _manager: WorkQueue&lt;&#39;static&gt;) -&gt; Result&lt;(), Error&gt; {</span>
+<span class="doccomment">//!         info!(&quot;hello&quot;);</span>
+<span class="doccomment">//!         Ok(())</span>
+<span class="doccomment">//!     }</span>
+<span class="doccomment">//!     fn function2(&amp;mut self, _manager: WorkQueue&lt;&#39;static&gt;, val1: u32, val2: u32) -&gt; Result&lt;(bool, bool), Error&gt; {</span>
+<span class="doccomment">//!         info!(&quot;hello&quot;);</span>
+<span class="doccomment">//!         Ok((false, true))</span>
+<span class="doccomment">//!     }</span>
+<span class="doccomment">//! }</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! fn main() {</span>
+<span class="doccomment">//!     let mut man = WaitableManager::new();</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//!     let handler = port_handler(man.work_queue(), &quot;hello&quot;, HelloInterface::dispatch).unwrap();</span>
+<span class="doccomment">//!     man.work_queue().spawn(FutureObj::new(Box::new(handler)));</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! #   let man = FakeMan;</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//!     man.run();</span>
+<span class="doccomment">//! }</span>
+<span class="doccomment">//! # // We can&#39;t run the WaitableManager, since that&#39;ll attempt to run syscalls</span>
+<span class="doccomment">//! # // that aren&#39;t implemented.</span>
+<span class="doccomment">//! # struct FakeMan;</span>
+<span class="doccomment">//! # impl FakeMan { fn run(&amp;self) {} }</span>
+<span class="doccomment">//! ```</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! ### Objects</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! An Object backs every Session. This object is the structure which implements</span>
+<span class="doccomment">//! the Interface trait. It contains the state of that specific session, and may</span>
+<span class="doccomment">//! be mutated by any IPC request. A common pattern is to have an IPC request</span>
+<span class="doccomment">//! contain an initialization method containing various parameters to configure</span>
+<span class="doccomment">//! the rest of the operations available on that session.</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! Note that a single interface may be implemented by multiple different</span>
+<span class="doccomment">//! Object. This can be used to implement different access control based on the</span>
+<span class="doccomment">//! interface used to access the service, for instance. Nintendo uses this</span>
+<span class="doccomment">//! pattern: `bsd:u` and `bsd:s` use the same interface, but have different</span>
+<span class="doccomment">//! access rights.</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! ### Subsessions</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! While the &quot;root&quot; session is generally created from a Port Handler, the user</span>
+<span class="doccomment">//! is free to create and return new subsessions. This can be done by creating</span>
+<span class="doccomment">//! a session pair with [crate::syscalls::create_session()], spawning a new</span>
+<span class="doccomment">//! Session Handler with [fn new_session_wrapper], and returning the client-side</span>
+<span class="doccomment">//! session handle. Here&#39;s an example:</span>
+<span class="doccomment">//!</span>
+<span class="comment">// no_run because port_handler will fail on linux...</span>
+<span class="doccomment">//! ```no_run</span>
+<span class="doccomment">//! extern crate alloc;</span>
+<span class="doccomment">//! use alloc::boxed::Box;</span>
+<span class="doccomment">//! use sunrise_libuser::futures::WorkQueue;</span>
+<span class="doccomment">//! use sunrise_libuser::futures_rs::future::FutureObj;</span>
+<span class="doccomment">//! use sunrise_libuser::example::{IExample3, IExample3Subsession, IExample3SubsessionProxy};</span>
+<span class="doccomment">//! use sunrise_libuser::syscalls;</span>
+<span class="doccomment">//! use sunrise_libuser::error::Error;</span>
+<span class="doccomment">//! use sunrise_libuser::ipc::server::new_session_wrapper;</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! #[derive(Debug, Default, Clone)]</span>
+<span class="doccomment">//! struct HelloInterface;</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! impl IExample3 for HelloInterface {</span>
+<span class="doccomment">//!     fn function(&amp;mut self, work_queue: WorkQueue&lt;&#39;static&gt;) -&gt; Result&lt;IExample3SubsessionProxy, Error&gt; {</span>
+<span class="doccomment">//!         let (server, client) = syscalls::create_session(false, 0)?;</span>
+<span class="doccomment">//!         let wrapper = new_session_wrapper(work_queue.clone(), server, Subsession, Subsession::dispatch);</span>
+<span class="doccomment">//!         work_queue.spawn(FutureObj::new(Box::new(wrapper)));</span>
+<span class="doccomment">//!         Ok(IExample3SubsessionProxy::from(client))</span>
+<span class="doccomment">//!     }</span>
+<span class="doccomment">//! }</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! #[derive(Debug, Clone)]</span>
+<span class="doccomment">//! struct Subsession;</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! impl IExample3Subsession for Subsession {}</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! # fn main() {</span>
+<span class="doccomment">//! #     use sunrise_libuser::futures::WaitableManager;</span>
+<span class="doccomment">//! #     use sunrise_libuser::ipc::server::port_handler;</span>
+<span class="doccomment">//! #     let mut man = WaitableManager::new();</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! #     let handler = port_handler(man.work_queue(), &quot;hello&quot;, HelloInterface::dispatch).unwrap();</span>
+<span class="doccomment">//! #     man.work_queue().spawn(FutureObj::new(Box::new(handler)));</span>
+<span class="doccomment">//! # }</span>
+<span class="doccomment">//! ```</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! ### Asynchronous Traits</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! A server might want to wait for asynchronous events to occur before</span>
+<span class="doccomment">//! answering: for instance, the `read()` function of a filesystem might want</span>
+<span class="doccomment">//! to wait for an [crate::types::IRQEvent] to get signaled before getting the</span>
+<span class="doccomment">//! data from the disk and returning it to the client.</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! This is doable by using the Asynchronous traits. Those return a Future</span>
+<span class="doccomment">//! instead of directly returning the Result. This has one huge downside: the</span>
+<span class="doccomment">//! futures need to be Boxed, incuring a needless heap allocation. This should</span>
+<span class="doccomment">//! get fixed when `impl Trait` in traits or `async fn` in traits is</span>
+<span class="doccomment">//! implemented.</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! Here&#39;s an example usage:</span>
+<span class="doccomment">//!</span>
+<span class="comment">// no_run because port_handler will fail on linux.</span>
+<span class="doccomment">//! ```no_run</span>
+<span class="doccomment">//! #![feature(async_await)]</span>
+<span class="doccomment">//! extern crate alloc;</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! use core::future::Future;</span>
+<span class="doccomment">//! use alloc::boxed::Box;</span>
+<span class="doccomment">//! use sunrise_libuser::futures::WorkQueue;</span>
+<span class="doccomment">//! use sunrise_libuser::futures_rs::future::FutureObj;</span>
+<span class="doccomment">//! use sunrise_libuser::example::IExample4Async;</span>
+<span class="doccomment">//! use sunrise_libuser::types::SharedMemory;</span>
+<span class="doccomment">//! use sunrise_libuser::error::{Error, KernelError};</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! #[derive(Debug, Default, Clone)]</span>
+<span class="doccomment">//! struct HelloInterface;</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! fn do_async_stuff() -&gt; impl Future&lt;Output=()&gt; + Send {</span>
+<span class="doccomment">//!     futures::future::ready(())</span>
+<span class="doccomment">//! }</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! impl IExample4Async for HelloInterface {</span>
+<span class="doccomment">//!     fn function&lt;&#39;a&gt;(&amp;&#39;a mut self, manager: WorkQueue&lt;&#39;static&gt;, val: &amp;u8) -&gt; FutureObj&lt;&#39;a, Result&lt;SharedMemory, Error&gt;&gt; {</span>
+<span class="doccomment">//!         FutureObj::new(Box::new(async move {</span>
+<span class="doccomment">//!             do_async_stuff().await;</span>
+<span class="doccomment">//!             Err(KernelError::PortRemoteDead.into())</span>
+<span class="doccomment">//!         }))</span>
+<span class="doccomment">//!     }</span>
+<span class="doccomment">//! }</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! # fn main() {</span>
+<span class="doccomment">//! #     use sunrise_libuser::futures::WaitableManager;</span>
+<span class="doccomment">//! #     use sunrise_libuser::ipc::server::port_handler;</span>
+<span class="doccomment">//! #     let mut man = WaitableManager::new();</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! #     let handler = port_handler(man.work_queue(), &quot;hello&quot;, HelloInterface::dispatch).unwrap();</span>
+<span class="doccomment">//! #     man.work_queue().spawn(FutureObj::new(Box::new(handler)));</span>
+<span class="doccomment">//! # }</span>
+<span class="doccomment">//! ```</span>
+
+<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">syscalls</span>;
+<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">types</span>::{<span class="ident">ServerPort</span>, <span class="ident">ServerSession</span>};
+<span class="kw">use</span> <span class="ident">alloc</span>::<span class="ident">boxed</span>::<span class="ident">Box</span>;
+<span class="kw">use</span> <span class="ident">core</span>::<span class="ident">ops</span>::{<span class="ident">Deref</span>, <span class="ident">DerefMut</span>, <span class="ident">Index</span>};
+<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">error</span>::{<span class="ident">KernelError</span>, <span class="ident">Error</span>};
+<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">ipc</span>::<span class="ident">Message</span>;
+<span class="kw">use</span> <span class="ident">futures</span>::<span class="ident">future</span>::{<span class="ident">FutureObj</span>, <span class="ident">FutureExt</span>};
+<span class="kw">use</span> <span class="ident">core</span>::<span class="ident">future</span>::<span class="ident">Future</span>;
+<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">futures</span>::<span class="ident">WorkQueue</span>;
+
+<span class="doccomment">/// Wrapper struct that forces the alignment to 0x10. Somewhat necessary for the</span>
+<span class="doccomment">/// IPC command buffer.</span>
+<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">C</span>, <span class="ident">align</span>(<span class="number">16</span>))]</span>
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
+<span class="kw">struct</span> <span class="ident">Align16</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>(<span class="ident">T</span>);
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> <span class="ident">Deref</span> <span class="kw">for</span> <span class="ident">Align16</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
+    <span class="kw">type</span> <span class="ident">Target</span> <span class="op">=</span> <span class="ident">T</span>;
+    <span class="kw">fn</span> <span class="ident">deref</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="ident">T</span> {
+        <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0</span>
+    }
+}
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> <span class="ident">DerefMut</span> <span class="kw">for</span> <span class="ident">Align16</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">deref_mut</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">T</span> {
+        <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>.<span class="number">0</span>
+    }
+}
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span>, <span class="ident">Idx</span><span class="op">&gt;</span> <span class="ident">Index</span><span class="op">&lt;</span><span class="ident">Idx</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Align16</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> <span class="kw">where</span> <span class="ident">T</span>: <span class="ident">Index</span><span class="op">&lt;</span><span class="ident">Idx</span><span class="op">&gt;</span> {
+    <span class="kw">type</span> <span class="ident">Output</span> <span class="op">=</span> <span class="ident">T</span>::<span class="ident">Output</span>;
+
+    <span class="kw">fn</span> <span class="ident">index</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">index</span>: <span class="ident">Idx</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="ident">T</span>::<span class="ident">Output</span> {
+        <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0</span>[<span class="ident">index</span>]
+    }
+}
+
+<span class="doccomment">/// Encode an 8-character service string into an u64</span>
+<span class="kw">fn</span> <span class="ident">encode_bytes</span>(<span class="ident">s</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">u64</span> {
+    <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">s</span>.<span class="ident">len</span>() <span class="op">&lt;</span><span class="op">=</span> <span class="number">8</span>);
+    <span class="kw">let</span> <span class="ident">s</span> <span class="op">=</span> <span class="ident">s</span>.<span class="ident">as_bytes</span>();
+    <span class="number">0</span>
+        <span class="op">|</span> (<span class="ident">u64</span>::<span class="ident">from</span>(<span class="kw-2">*</span><span class="ident">s</span>.<span class="ident">get</span>(<span class="number">0</span>).<span class="ident">unwrap_or</span>(<span class="kw-2">&amp;</span><span class="number">0</span>))) <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">00</span> <span class="op">|</span> (<span class="ident">u64</span>::<span class="ident">from</span>(<span class="kw-2">*</span><span class="ident">s</span>.<span class="ident">get</span>(<span class="number">1</span>).<span class="ident">unwrap_or</span>(<span class="kw-2">&amp;</span><span class="number">0</span>))) <span class="op">&lt;</span><span class="op">&lt;</span>  <span class="number">8</span>
+        <span class="op">|</span> (<span class="ident">u64</span>::<span class="ident">from</span>(<span class="kw-2">*</span><span class="ident">s</span>.<span class="ident">get</span>(<span class="number">2</span>).<span class="ident">unwrap_or</span>(<span class="kw-2">&amp;</span><span class="number">0</span>))) <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">16</span> <span class="op">|</span> (<span class="ident">u64</span>::<span class="ident">from</span>(<span class="kw-2">*</span><span class="ident">s</span>.<span class="ident">get</span>(<span class="number">3</span>).<span class="ident">unwrap_or</span>(<span class="kw-2">&amp;</span><span class="number">0</span>))) <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">24</span>
+        <span class="op">|</span> (<span class="ident">u64</span>::<span class="ident">from</span>(<span class="kw-2">*</span><span class="ident">s</span>.<span class="ident">get</span>(<span class="number">4</span>).<span class="ident">unwrap_or</span>(<span class="kw-2">&amp;</span><span class="number">0</span>))) <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">32</span> <span class="op">|</span> (<span class="ident">u64</span>::<span class="ident">from</span>(<span class="kw-2">*</span><span class="ident">s</span>.<span class="ident">get</span>(<span class="number">5</span>).<span class="ident">unwrap_or</span>(<span class="kw-2">&amp;</span><span class="number">0</span>))) <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">40</span>
+        <span class="op">|</span> (<span class="ident">u64</span>::<span class="ident">from</span>(<span class="kw-2">*</span><span class="ident">s</span>.<span class="ident">get</span>(<span class="number">6</span>).<span class="ident">unwrap_or</span>(<span class="kw-2">&amp;</span><span class="number">0</span>))) <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">48</span> <span class="op">|</span> (<span class="ident">u64</span>::<span class="ident">from</span>(<span class="kw-2">*</span><span class="ident">s</span>.<span class="ident">get</span>(<span class="number">7</span>).<span class="ident">unwrap_or</span>(<span class="kw-2">&amp;</span><span class="number">0</span>))) <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">56</span>
+}
+
+<span class="doccomment">/// Infinite loop future that waits for `port` to get signaled, then accepts a</span>
+<span class="doccomment">/// new session on the port, creates a new object backing the session using</span>
+<span class="doccomment">/// `T::default()`, and finally spawns a new session wrapper future using</span>
+<span class="doccomment">/// [new_session_wrapper()].</span>
+<span class="kw">fn</span> <span class="ident">common_port_handler</span><span class="op">&lt;</span><span class="ident">T</span>, <span class="ident">DISPATCH</span><span class="op">&gt;</span>(<span class="ident">work_queue</span>: <span class="ident">WorkQueue</span><span class="op">&lt;</span><span class="lifetime">&#39;static</span><span class="op">&gt;</span>, <span class="ident">port</span>: <span class="ident">ServerPort</span>, <span class="ident">dispatch</span>: <span class="ident">DISPATCH</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw">impl</span> <span class="ident">Future</span><span class="op">&lt;</span><span class="ident">Output</span><span class="op">=</span>()<span class="op">&gt;</span>
+<span class="kw">where</span>
+    <span class="ident">DISPATCH</span>: <span class="kw">for</span><span class="op">&lt;</span><span class="lifetime">&#39;b</span><span class="op">&gt;</span> <span class="ident">hrtb_hack</span>::<span class="ident">FutureCallback</span><span class="op">&lt;</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;b</span> <span class="kw-2">mut</span> <span class="ident">T</span>, <span class="ident">WorkQueue</span><span class="op">&lt;</span><span class="lifetime">&#39;static</span><span class="op">&gt;</span>, <span class="ident">u32</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;b</span> <span class="kw-2">mut</span> [<span class="ident">u8</span>]), <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident">Error</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+    <span class="ident">DISPATCH</span>: <span class="ident">Clone</span> <span class="op">+</span> <span class="ident">Unpin</span> <span class="op">+</span> <span class="ident">Send</span> <span class="op">+</span> <span class="lifetime">&#39;static</span>,
+    <span class="ident">T</span>: <span class="ident">Default</span> <span class="op">+</span> <span class="ident">Clone</span> <span class="op">+</span> <span class="ident">Unpin</span> <span class="op">+</span> <span class="ident">Send</span> <span class="op">+</span> <span class="lifetime">&#39;static</span>,
+{
+    <span class="kw">crate</span>::<span class="ident">loop_future</span>::<span class="ident">loop_fn</span>((<span class="ident">work_queue</span>, <span class="ident">dispatch</span>, <span class="ident">port</span>), <span class="op">|</span>(<span class="ident">work_queue</span>, <span class="ident">dispatch</span>, <span class="ident">port</span>)<span class="op">|</span> {
+        <span class="ident">port</span>.<span class="ident">wait_async</span>(<span class="ident">work_queue</span>.<span class="ident">clone</span>())
+            .<span class="ident">map</span>(<span class="kw">move</span> <span class="op">|</span><span class="ident">res</span><span class="op">|</span> {
+                <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">err</span>) <span class="op">=</span> <span class="ident">res</span> {
+                    <span class="comment">// This instance of WaitAsync can return one of two errors:</span>
+                    <span class="comment">// - InvalidAddress: Someone did something silly with</span>
+                    <span class="comment">//   memory.</span>
+                    <span class="comment">// - InvalidHandle: Shouldn&#39;t happen since we hold the</span>
+                    <span class="comment">//   ServerPort. Someone might have manually closed it?</span>
+                    <span class="macro">unreachable</span><span class="macro">!</span>(<span class="string">&quot;WaitAsync errors cannot be reached from here. {:?}&quot;</span>, <span class="ident">err</span>);
+                }
+                <span class="kw">let</span> <span class="ident">handle</span> <span class="op">=</span> <span class="ident">port</span>.<span class="ident">accept</span>().<span class="ident">unwrap</span>();
+                <span class="kw">let</span> <span class="ident">future</span> <span class="op">=</span> <span class="ident">new_session_wrapper</span>(<span class="ident">work_queue</span>.<span class="ident">clone</span>(), <span class="ident">handle</span>, <span class="ident">T</span>::<span class="ident">default</span>(), <span class="ident">dispatch</span>.<span class="ident">clone</span>());
+                <span class="ident">work_queue</span>.<span class="ident">spawn</span>(<span class="ident">FutureObj</span>::<span class="ident">new</span>(<span class="ident">Box</span>::<span class="ident">new</span>(<span class="ident">future</span>)));
+                <span class="kw">crate</span>::<span class="ident">loop_future</span>::<span class="ident">Loop</span>::<span class="ident">Continue</span>((<span class="ident">work_queue</span>, <span class="ident">dispatch</span>, <span class="ident">port</span>))
+            })
+    })
+}
+
+<span class="doccomment">/// Creates a port through [crate::sm::IUserInterfaceProxy::register_service()]</span>
+<span class="doccomment">/// with the given name, and returns a future which will handle the port - that</span>
+<span class="doccomment">/// is, it will continuously accept new sessions on the port, and create backing</span>
+<span class="doccomment">/// objects through `T::default()`, and spawn a top-level future handling that</span>
+<span class="doccomment">/// sesion with [new_session_wrapper()].</span>
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">port_handler</span><span class="op">&lt;</span><span class="ident">T</span>, <span class="ident">DISPATCH</span><span class="op">&gt;</span>(<span class="ident">work_queue</span>: <span class="ident">WorkQueue</span><span class="op">&lt;</span><span class="lifetime">&#39;static</span><span class="op">&gt;</span>, <span class="ident">server_name</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>, <span class="ident">dispatch</span>: <span class="ident">DISPATCH</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="kw">impl</span> <span class="ident">Future</span><span class="op">&lt;</span><span class="ident">Output</span><span class="op">=</span>()<span class="op">&gt;</span>, <span class="ident">Error</span><span class="op">&gt;</span>
+<span class="kw">where</span>
+    <span class="ident">DISPATCH</span>: <span class="kw">for</span><span class="op">&lt;</span><span class="lifetime">&#39;b</span><span class="op">&gt;</span> <span class="ident">hrtb_hack</span>::<span class="ident">FutureCallback</span><span class="op">&lt;</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;b</span> <span class="kw-2">mut</span> <span class="ident">T</span>, <span class="ident">WorkQueue</span><span class="op">&lt;</span><span class="lifetime">&#39;static</span><span class="op">&gt;</span>, <span class="ident">u32</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;b</span> <span class="kw-2">mut</span> [<span class="ident">u8</span>]), <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident">Error</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+    <span class="ident">DISPATCH</span>: <span class="ident">Clone</span> <span class="op">+</span> <span class="ident">Unpin</span> <span class="op">+</span> <span class="ident">Send</span> <span class="op">+</span> <span class="lifetime">&#39;static</span>,
+    <span class="ident">T</span>: <span class="ident">Default</span> <span class="op">+</span> <span class="ident">Clone</span> <span class="op">+</span> <span class="ident">Unpin</span> <span class="op">+</span> <span class="ident">Send</span> <span class="op">+</span> <span class="lifetime">&#39;static</span>,
+{
+    <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">sm</span>::<span class="ident">IUserInterfaceProxy</span>;
+    <span class="comment">// We use `new()` and not `raw_new()` in order to avoid deadlocking when closing the</span>
+    <span class="comment">// IUserInterfaceProxy handle. See implementation note in sm/src/main.rs</span>
+    <span class="kw">let</span> <span class="ident">port</span> <span class="op">=</span> <span class="ident">IUserInterfaceProxy</span>::<span class="ident">new</span>()<span class="question-mark">?</span>.<span class="ident">register_service</span>(<span class="ident">encode_bytes</span>(<span class="ident">server_name</span>), <span class="bool-val">false</span>, <span class="number">0</span>)<span class="question-mark">?</span>;
+    <span class="prelude-val">Ok</span>(<span class="ident">common_port_handler</span>(<span class="ident">work_queue</span>, <span class="ident">port</span>, <span class="ident">dispatch</span>))
+}
+
+<span class="doccomment">/// Creates a port through [syscalls::manage_named_port()] with the given name,</span>
+<span class="doccomment">/// and returns a future which will handle the port - that is, it</span>
+<span class="doccomment">/// will continuously accept new sessions on the port, and create backing</span>
+<span class="doccomment">/// objects through `T::default()`, and spawn a top-level future handling that</span>
+<span class="doccomment">/// sesion with [new_session_wrapper()].</span>
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">managed_port_handler</span><span class="op">&lt;</span><span class="ident">T</span>, <span class="ident">DISPATCH</span><span class="op">&gt;</span>(<span class="ident">work_queue</span>: <span class="ident">WorkQueue</span><span class="op">&lt;</span><span class="lifetime">&#39;static</span><span class="op">&gt;</span>, <span class="ident">server_name</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>, <span class="ident">dispatch</span>: <span class="ident">DISPATCH</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="kw">impl</span> <span class="ident">Future</span><span class="op">&lt;</span><span class="ident">Output</span><span class="op">=</span>()<span class="op">&gt;</span>, <span class="ident">Error</span><span class="op">&gt;</span>
+<span class="kw">where</span>
+    <span class="ident">DISPATCH</span>: <span class="kw">for</span><span class="op">&lt;</span><span class="lifetime">&#39;b</span><span class="op">&gt;</span> <span class="ident">hrtb_hack</span>::<span class="ident">FutureCallback</span><span class="op">&lt;</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;b</span> <span class="kw-2">mut</span> <span class="ident">T</span>, <span class="ident">WorkQueue</span><span class="op">&lt;</span><span class="lifetime">&#39;static</span><span class="op">&gt;</span>, <span class="ident">u32</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;b</span> <span class="kw-2">mut</span> [<span class="ident">u8</span>]), <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident">Error</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+    <span class="ident">DISPATCH</span>: <span class="ident">Clone</span> <span class="op">+</span> <span class="ident">Unpin</span> <span class="op">+</span> <span class="ident">Send</span> <span class="op">+</span> <span class="lifetime">&#39;static</span>,
+    <span class="ident">T</span>: <span class="ident">Default</span> <span class="op">+</span> <span class="ident">Clone</span> <span class="op">+</span> <span class="ident">Unpin</span> <span class="op">+</span> <span class="ident">Send</span> <span class="op">+</span> <span class="lifetime">&#39;static</span>,
+{
+    <span class="kw">let</span> <span class="ident">port</span> <span class="op">=</span> <span class="ident">syscalls</span>::<span class="ident">manage_named_port</span>(<span class="ident">server_name</span>, <span class="number">0</span>)<span class="question-mark">?</span>;
+    <span class="prelude-val">Ok</span>(<span class="ident">common_port_handler</span>(<span class="ident">work_queue</span>, <span class="ident">port</span>, <span class="ident">dispatch</span>))
+}
+
+<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">hrtb_hack</span> {
+    <span class="doccomment">//! Ideally, that&#39;s what we would want to write</span>
+    <span class="doccomment">//! async fn new_session_wrapper&lt;F&gt;(mut dispatch: F) -&gt; ()</span>
+    <span class="doccomment">//! where</span>
+    <span class="doccomment">//!     F: for&lt;&#39;a&gt; FnMut&lt;(&amp;&#39;a mut [u8],)&gt;,</span>
+    <span class="doccomment">//!     for&lt;&#39;a&gt; &lt;F as FnOnce&lt;(&amp;&#39;a mut [u8],)&gt;&gt;::Output: Future&lt;Output = Result&lt;(), ()&gt;&gt;,</span>
+    <span class="doccomment">//! {</span>
+    <span class="doccomment">//!     // Session wrapper code</span>
+    <span class="doccomment">//! }</span>
+    <span class="comment">//</span>
+    <span class="doccomment">//! But the compiler seems to have trouble reasoning about associated types</span>
+    <span class="doccomment">//! in an HRTB context (maybe that&#39;s just not possible ? Not sure).</span>
+    <span class="doccomment">//!</span>
+    <span class="doccomment">//! To work around this, we&#39;ll make a supertrait over `FnMut&lt;T&gt;` and make</span>
+    <span class="doccomment">//! use of lifetime ellision rules to get this done.</span>
+
+    <span class="doccomment">//! So instead, we&#39;ll make a wrapper for `FnMut` that has the right trait bound</span>
+    <span class="doccomment">//! on its associated output type directly, Implement it for all FnMut with</span>
+    <span class="doccomment">//! Ret = Output, and use that as a bound instead.</span>
+
+    <span class="kw">use</span> <span class="ident">core</span>::<span class="ident">future</span>::<span class="ident">Future</span>;
+
+    <span class="doccomment">/// A similar trait to FnMut() but moving the Ret associated trait to a</span>
+    <span class="doccomment">/// generic position, simplifying stuff. See module docs.</span>
+    <span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">FutureCallback</span><span class="op">&lt;</span><span class="ident">T</span>, <span class="ident">O</span><span class="op">&gt;</span>: <span class="ident">FnMut</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
+        <span class="doccomment">/// See [type FnMut::Output]</span>
+        <span class="kw">type</span> <span class="ident">Ret</span>: <span class="ident">Future</span><span class="op">&lt;</span><span class="ident">Output</span> <span class="op">=</span> <span class="ident">O</span><span class="op">&gt;</span> <span class="op">+</span> <span class="ident">Send</span>;
+
+        <span class="doccomment">/// See [FnMut::call_mut()].</span>
+        <span class="kw">fn</span> <span class="ident">call</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">x</span>: <span class="ident">T</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span>::<span class="ident">Ret</span>;
+    }
+
+    <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span>, <span class="ident">O</span>, <span class="ident">F</span>: <span class="ident">FnMut</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="ident">FutureCallback</span><span class="op">&lt;</span><span class="ident">T</span>, <span class="ident">O</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">F</span>
+    <span class="kw">where</span>
+        <span class="ident">F</span>::<span class="ident">Output</span>: <span class="ident">Future</span><span class="op">&lt;</span><span class="ident">Output</span> <span class="op">=</span> <span class="ident">O</span><span class="op">&gt;</span> <span class="op">+</span> <span class="ident">Send</span>,
+    {
+        <span class="kw">type</span> <span class="ident">Ret</span> <span class="op">=</span> <span class="ident">F</span>::<span class="ident">Output</span>;
+
+        <span class="kw">fn</span> <span class="ident">call</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">x</span>: <span class="ident">T</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span>::<span class="ident">Ret</span> {
+            <span class="self">self</span>.<span class="ident">call_mut</span>(<span class="ident">x</span>)
+        }
+    }
+}
+
+<span class="doccomment">/// Creates a new top-level future that handles session.</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// The returned future will continuously accept new incoming requests on the</span>
+<span class="doccomment">/// handle, call the dispatch function with the given object, and the request&#39;</span>
+<span class="doccomment">/// cmdid and buffer, and finally reply to the request.</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// It may be used to open subsessions.</span>
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new_session_wrapper</span><span class="op">&lt;</span><span class="ident">T</span>, <span class="ident">DISPATCH</span><span class="op">&gt;</span>(<span class="ident">work_queue</span>: <span class="ident">WorkQueue</span><span class="op">&lt;</span><span class="lifetime">&#39;static</span><span class="op">&gt;</span>, <span class="ident">handle</span>: <span class="ident">ServerSession</span>, <span class="kw-2">mut</span> <span class="ident">object</span>: <span class="ident">T</span>, <span class="kw-2">mut</span> <span class="ident">dispatch</span>: <span class="ident">DISPATCH</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw">impl</span> <span class="ident">Future</span><span class="op">&lt;</span><span class="ident">Output</span> <span class="op">=</span> ()<span class="op">&gt;</span> <span class="op">+</span> <span class="ident">Send</span>
+<span class="kw">where</span>
+    <span class="ident">DISPATCH</span>: <span class="kw">for</span><span class="op">&lt;</span><span class="lifetime">&#39;b</span><span class="op">&gt;</span> <span class="ident">hrtb_hack</span>::<span class="ident">FutureCallback</span><span class="op">&lt;</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;b</span> <span class="kw-2">mut</span> <span class="ident">T</span>, <span class="ident">WorkQueue</span><span class="op">&lt;</span><span class="lifetime">&#39;static</span><span class="op">&gt;</span>, <span class="ident">u32</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;b</span> <span class="kw-2">mut</span> [<span class="ident">u8</span>]), <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident">Error</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+    <span class="ident">DISPATCH</span>: <span class="ident">Unpin</span> <span class="op">+</span> <span class="ident">Send</span> <span class="op">+</span> <span class="ident">Clone</span> <span class="op">+</span> <span class="lifetime">&#39;static</span>,
+    <span class="ident">T</span>: <span class="ident">Unpin</span> <span class="op">+</span> <span class="ident">Send</span> <span class="op">+</span> <span class="ident">Clone</span> <span class="op">+</span> <span class="lifetime">&#39;static</span>,
+{
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">buf</span> <span class="op">=</span> <span class="ident">Align16</span>([<span class="number">0</span>; <span class="number">0x100</span>]);
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">pointer_buf</span> <span class="op">=</span> [<span class="number">0</span>; <span class="number">0x400</span>];
+
+    <span class="kw">async</span> <span class="kw">move</span> {
+        <span class="kw">loop</span> {
+            <span class="macro">debug</span><span class="macro">!</span>(<span class="string">&quot;Waiting for a new session on handle {:?}&quot;</span>, <span class="ident">handle</span>);
+            <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="ident">handle</span>.<span class="ident">wait_async</span>(<span class="ident">work_queue</span>.<span class="ident">clone</span>()).<span class="kw">await</span>;
+
+            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">err</span>) <span class="op">=</span> <span class="ident">res</span> {
+                <span class="comment">// This instance of WaitAsync can return one of two errors:</span>
+                <span class="comment">// - InvalidAddress: Someone did something silly with</span>
+                <span class="comment">//   memory.</span>
+                <span class="comment">// - InvalidHandle: Shouldn&#39;t happen since we hold the</span>
+                <span class="comment">//   ServerPort. Someone might have manually closed it?</span>
+                <span class="macro">unreachable</span><span class="macro">!</span>(<span class="string">&quot;WaitAsync errors cannot be reached from here. {:?}&quot;</span>, <span class="ident">err</span>);
+            }
+
+            <span class="comment">// Push a C Buffer before receiving.</span>
+            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">req</span> <span class="op">=</span> <span class="ident">Message</span>::<span class="op">&lt;</span>(), [<span class="kw">_</span>; <span class="number">1</span>], [<span class="kw">_</span>; <span class="number">0</span>], [<span class="kw">_</span>; <span class="number">0</span>]<span class="op">&gt;</span>::<span class="ident">new_request</span>(<span class="prelude-val">None</span>, <span class="number">0</span>);
+            <span class="ident">req</span>.<span class="ident">push_in_pointer</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">pointer_buf</span>, <span class="bool-val">false</span>);
+            <span class="ident">req</span>.<span class="ident">pack</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">buf</span>[..]);
+
+            <span class="comment">// Use a timeout of 0 to avoid blocking.</span>
+            <span class="kw">match</span> <span class="ident">handle</span>.<span class="ident">receive</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">buf</span>[..], <span class="prelude-val">Some</span>(<span class="number">0</span>)) {
+                <span class="prelude-val">Err</span>(<span class="ident">Error</span>::<span class="ident">Kernel</span>(<span class="ident">KernelError</span>::<span class="ident">Timeout</span>, <span class="kw">_</span>)) <span class="op">=</span><span class="op">&gt;</span> <span class="kw">continue</span>,
+                <span class="ident">res</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">res</span>.<span class="ident">unwrap</span>(),
+            }
+
+            <span class="kw">let</span> <span class="ident">tycmdid</span> <span class="op">=</span> <span class="kw">super</span>::<span class="ident">find_ty_cmdid</span>(<span class="kw-2">&amp;</span><span class="ident">buf</span>[..]);
+            <span class="macro">debug</span><span class="macro">!</span>(<span class="string">&quot;Got request for: {:?}&quot;</span>, <span class="ident">tycmdid</span>);
+
+            <span class="kw">let</span> <span class="ident">close</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">tycmdid</span> {
+                <span class="prelude-val">Some</span>((<span class="number">4</span>, <span class="ident">cmdid</span>)) <span class="op">|</span> <span class="prelude-val">Some</span>((<span class="number">6</span>, <span class="ident">cmdid</span>)) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">dispatch</span>.<span class="ident">call</span>((<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">object</span>, <span class="ident">work_queue</span>.<span class="ident">clone</span>(), <span class="ident">cmdid</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">buf</span>[..])).<span class="kw">await</span>
+                    .<span class="ident">map</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="bool-val">false</span>)
+                    .<span class="ident">unwrap_or_else</span>(<span class="op">|</span><span class="ident">err</span><span class="op">|</span> { <span class="macro">error</span><span class="macro">!</span>(<span class="string">&quot;Dispatch method errored out: {:?}&quot;</span>, <span class="ident">err</span>); <span class="bool-val">true</span> }),
+                <span class="prelude-val">Some</span>((<span class="number">2</span>, <span class="kw">_</span>)) <span class="op">=</span><span class="op">&gt;</span> <span class="bool-val">true</span>,
+                <span class="prelude-val">Some</span>((<span class="number">5</span>, <span class="ident">cmdid</span>)) <span class="op">|</span> <span class="prelude-val">Some</span>((<span class="number">7</span>, <span class="ident">cmdid</span>)) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">control_dispatch</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">object</span>, <span class="ident">dispatch</span>.<span class="ident">clone</span>(), <span class="ident">work_queue</span>.<span class="ident">clone</span>(), <span class="ident">cmdid</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">buf</span>[..])
+                    .<span class="ident">map</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="bool-val">false</span>)
+                    .<span class="ident">unwrap_or_else</span>(<span class="op">|</span><span class="ident">err</span><span class="op">|</span> { <span class="macro">error</span><span class="macro">!</span>(<span class="string">&quot;Dispatch method errored out: {:?}&quot;</span>, <span class="ident">err</span>); <span class="bool-val">true</span> }),
+                <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> <span class="bool-val">true</span>,
+            };
+
+            <span class="kw">if</span> <span class="ident">close</span> {
+                <span class="kw">break</span>;
+            }
+
+            <span class="ident">handle</span>.<span class="ident">reply</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">buf</span>[..]).<span class="ident">unwrap</span>();
+        }
+    }
+}
+
+<span class="doccomment">/// Implement the Control ipc cmd types.</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// See [switchbrew](https://switchbrew.org/w/index.php?title=IPC_Marshalling#Control)</span>
+<span class="kw">fn</span> <span class="ident">control_dispatch</span><span class="op">&lt;</span><span class="ident">T</span>, <span class="ident">DISPATCH</span><span class="op">&gt;</span>(<span class="ident">object</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">T</span>, <span class="ident">dispatch</span>: <span class="ident">DISPATCH</span>, <span class="ident">manager</span>: <span class="ident">WorkQueue</span><span class="op">&lt;</span><span class="lifetime">&#39;static</span><span class="op">&gt;</span>, <span class="ident">cmdid</span>: <span class="ident">u32</span>, <span class="ident">buf</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> [<span class="ident">u8</span>]) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident">Error</span><span class="op">&gt;</span>
+<span class="kw">where</span>
+    <span class="ident">DISPATCH</span>: <span class="kw">for</span><span class="op">&lt;</span><span class="lifetime">&#39;b</span><span class="op">&gt;</span> <span class="ident">hrtb_hack</span>::<span class="ident">FutureCallback</span><span class="op">&lt;</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;b</span> <span class="kw-2">mut</span> <span class="ident">T</span>, <span class="ident">WorkQueue</span><span class="op">&lt;</span><span class="lifetime">&#39;static</span><span class="op">&gt;</span>, <span class="ident">u32</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;b</span> <span class="kw-2">mut</span> [<span class="ident">u8</span>]), <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident">Error</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+    <span class="ident">DISPATCH</span>: <span class="ident">Unpin</span> <span class="op">+</span> <span class="ident">Send</span> <span class="op">+</span> <span class="ident">Clone</span> <span class="op">+</span> <span class="lifetime">&#39;static</span>,
+    <span class="ident">T</span>: <span class="ident">Unpin</span> <span class="op">+</span> <span class="ident">Send</span> <span class="op">+</span> <span class="ident">Clone</span> <span class="op">+</span> <span class="lifetime">&#39;static</span>
+{
+    <span class="kw">match</span> <span class="ident">cmdid</span> {
+        <span class="number">2</span> <span class="op">|</span> <span class="number">4</span> <span class="op">=</span><span class="op">&gt;</span> {
+            <span class="kw">let</span> (<span class="ident">server</span>, <span class="ident">client</span>) <span class="op">=</span> <span class="ident">syscalls</span>::<span class="ident">create_session</span>(<span class="bool-val">false</span>, <span class="number">0</span>)<span class="question-mark">?</span>;
+            <span class="kw">let</span> <span class="ident">new_object</span> <span class="op">=</span> <span class="ident">object</span>.<span class="ident">clone</span>();
+            <span class="kw">let</span> <span class="ident">future</span> <span class="op">=</span> <span class="ident">new_session_wrapper</span>(<span class="ident">manager</span>.<span class="ident">clone</span>(), <span class="ident">server</span>, <span class="ident">new_object</span>, <span class="ident">dispatch</span>);
+            <span class="ident">manager</span>.<span class="ident">spawn</span>(<span class="ident">FutureObj</span>::<span class="ident">new</span>(<span class="ident">Box</span>::<span class="ident">new</span>(<span class="ident">future</span>)));
+
+            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">msg__</span> <span class="op">=</span> <span class="ident">Message</span>::<span class="op">&lt;</span>(), [<span class="kw">_</span>; <span class="number">0</span>], [<span class="kw">_</span>; <span class="number">0</span>], [<span class="kw">_</span>; <span class="number">1</span>]<span class="op">&gt;</span>::<span class="ident">new_response</span>(<span class="prelude-val">None</span>);
+            <span class="ident">msg__</span>.<span class="ident">push_handle_move</span>(<span class="ident">client</span>.<span class="ident">into_handle</span>());
+            <span class="ident">msg__</span>.<span class="ident">pack</span>(<span class="ident">buf</span>);
+            <span class="prelude-val">Ok</span>(())
+        },
+        <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> {
+            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">msg__</span> <span class="op">=</span> <span class="ident">Message</span>::<span class="op">&lt;</span>(), [<span class="kw">_</span>; <span class="number">0</span>], [<span class="kw">_</span>; <span class="number">0</span>], [<span class="kw">_</span>; <span class="number">0</span>]<span class="op">&gt;</span>::<span class="ident">new_response</span>(<span class="prelude-val">None</span>);
+            <span class="ident">msg__</span>.<span class="ident">set_error</span>(<span class="ident">KernelError</span>::<span class="ident">PortRemoteDead</span>.<span class="ident">make_ret</span>() <span class="kw">as</span> <span class="ident">u32</span>);
+            <span class="ident">msg__</span>.<span class="ident">pack</span>(<span class="ident">buf</span>);
+            <span class="prelude-val">Ok</span>(())
+        }
+    }
+}</pre></div>
+</section><section id="search" class="content hidden"></section><section class="footer"></section><script>window.rootPath = "../../../";window.currentCrate = "sunrise_libuser";</script><script src="../../../main.js"></script><script src="../../../source-script.js"></script><script src="../../../source-files.js"></script><script defer src="../../../search-index.js"></script></body></html>

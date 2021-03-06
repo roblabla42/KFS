@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["main",""],["update_keyboard","Task responsible for signaling KEYBOARD_INSTANCE's event at every keyboard update."]],"mod":[["ps2","PS/2 Keyboard Driver"]],"static":[["CAPABILITIES",""],["HEADER",""],["KEYBOARD_INSTANCE","Global instance of Keyboard."]],"struct":[["Keyboard","Keyboard handling structure."],["StaticService","Entry point interface."]]});

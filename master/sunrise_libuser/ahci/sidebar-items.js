@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["AhciInterfaceProxy","Main ahci interface."],["IDiskProxy","Interface to an AHCI device."]],"trait":[["AhciInterface","Main ahci interface."],["AhciInterfaceAsync","Main ahci interface."],["IDisk","Interface to an AHCI device."],["IDiskAsync","Interface to an AHCI device."]],"type":[["Block","A block (or sector) used by AHCI I/O operations."]]});

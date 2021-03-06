@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["FileStorage","Wrapper around a [FileOperations] exposing a StorageDevice interface."],["PartitionStorage","Wrapper over a IStorage that permit to access only a partition."]],"trait":[["IStorage","This is the interface for a raw device, usually a block device."]]});

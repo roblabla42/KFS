@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["KernelLand","The virtual memory belonging to kernel."],["RecursiveTablesLand","The virtual memory pointing to active page tables by recursion."],["UserLand","The virtual memory belonging to user."]],"trait":[["VirtualSpaceLand","A trait describing the splitting of virtual memory between Kernel and User. Implemented by UserLand and KernelLand"]]});

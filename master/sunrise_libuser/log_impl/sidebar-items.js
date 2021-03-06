@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["init","Initializes the global logger with the svc logger."]],"struct":[["Logger","Log implementation structure."]]});

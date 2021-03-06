@@ -1,0 +1,1181 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source to the Rust file `kernel/src/paging/process_memory.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>process_memory.rs.html -- source</title><link rel="stylesheet" type="text/css" href="../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../dark.css"><link rel="stylesheet" type="text/css" href="../../../light.css" id="themeStyle"><script src="../../../storage.js"></script><noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="shortcut icon" href="../../../favicon.ico"><style type="text/css">#crate-search{background-image:url("../../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu">&#9776;</div><a href='../../../sunrise_kernel/index.html'><div class='logo-container'><img src='../../../rust-logo.png' alt='logo'></div></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!"><img src="../../../brush.svg" width="18" alt="Pick another theme!"></button><div id="theme-choices"></div></div><script src="../../../theme.js"></script><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><a id="settings-menu" href="../../../settings.html"><img src="../../../wheel.svg" width="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><pre class="line-numbers"><span id="1">  1</span>
+<span id="2">  2</span>
+<span id="3">  3</span>
+<span id="4">  4</span>
+<span id="5">  5</span>
+<span id="6">  6</span>
+<span id="7">  7</span>
+<span id="8">  8</span>
+<span id="9">  9</span>
+<span id="10"> 10</span>
+<span id="11"> 11</span>
+<span id="12"> 12</span>
+<span id="13"> 13</span>
+<span id="14"> 14</span>
+<span id="15"> 15</span>
+<span id="16"> 16</span>
+<span id="17"> 17</span>
+<span id="18"> 18</span>
+<span id="19"> 19</span>
+<span id="20"> 20</span>
+<span id="21"> 21</span>
+<span id="22"> 22</span>
+<span id="23"> 23</span>
+<span id="24"> 24</span>
+<span id="25"> 25</span>
+<span id="26"> 26</span>
+<span id="27"> 27</span>
+<span id="28"> 28</span>
+<span id="29"> 29</span>
+<span id="30"> 30</span>
+<span id="31"> 31</span>
+<span id="32"> 32</span>
+<span id="33"> 33</span>
+<span id="34"> 34</span>
+<span id="35"> 35</span>
+<span id="36"> 36</span>
+<span id="37"> 37</span>
+<span id="38"> 38</span>
+<span id="39"> 39</span>
+<span id="40"> 40</span>
+<span id="41"> 41</span>
+<span id="42"> 42</span>
+<span id="43"> 43</span>
+<span id="44"> 44</span>
+<span id="45"> 45</span>
+<span id="46"> 46</span>
+<span id="47"> 47</span>
+<span id="48"> 48</span>
+<span id="49"> 49</span>
+<span id="50"> 50</span>
+<span id="51"> 51</span>
+<span id="52"> 52</span>
+<span id="53"> 53</span>
+<span id="54"> 54</span>
+<span id="55"> 55</span>
+<span id="56"> 56</span>
+<span id="57"> 57</span>
+<span id="58"> 58</span>
+<span id="59"> 59</span>
+<span id="60"> 60</span>
+<span id="61"> 61</span>
+<span id="62"> 62</span>
+<span id="63"> 63</span>
+<span id="64"> 64</span>
+<span id="65"> 65</span>
+<span id="66"> 66</span>
+<span id="67"> 67</span>
+<span id="68"> 68</span>
+<span id="69"> 69</span>
+<span id="70"> 70</span>
+<span id="71"> 71</span>
+<span id="72"> 72</span>
+<span id="73"> 73</span>
+<span id="74"> 74</span>
+<span id="75"> 75</span>
+<span id="76"> 76</span>
+<span id="77"> 77</span>
+<span id="78"> 78</span>
+<span id="79"> 79</span>
+<span id="80"> 80</span>
+<span id="81"> 81</span>
+<span id="82"> 82</span>
+<span id="83"> 83</span>
+<span id="84"> 84</span>
+<span id="85"> 85</span>
+<span id="86"> 86</span>
+<span id="87"> 87</span>
+<span id="88"> 88</span>
+<span id="89"> 89</span>
+<span id="90"> 90</span>
+<span id="91"> 91</span>
+<span id="92"> 92</span>
+<span id="93"> 93</span>
+<span id="94"> 94</span>
+<span id="95"> 95</span>
+<span id="96"> 96</span>
+<span id="97"> 97</span>
+<span id="98"> 98</span>
+<span id="99"> 99</span>
+<span id="100">100</span>
+<span id="101">101</span>
+<span id="102">102</span>
+<span id="103">103</span>
+<span id="104">104</span>
+<span id="105">105</span>
+<span id="106">106</span>
+<span id="107">107</span>
+<span id="108">108</span>
+<span id="109">109</span>
+<span id="110">110</span>
+<span id="111">111</span>
+<span id="112">112</span>
+<span id="113">113</span>
+<span id="114">114</span>
+<span id="115">115</span>
+<span id="116">116</span>
+<span id="117">117</span>
+<span id="118">118</span>
+<span id="119">119</span>
+<span id="120">120</span>
+<span id="121">121</span>
+<span id="122">122</span>
+<span id="123">123</span>
+<span id="124">124</span>
+<span id="125">125</span>
+<span id="126">126</span>
+<span id="127">127</span>
+<span id="128">128</span>
+<span id="129">129</span>
+<span id="130">130</span>
+<span id="131">131</span>
+<span id="132">132</span>
+<span id="133">133</span>
+<span id="134">134</span>
+<span id="135">135</span>
+<span id="136">136</span>
+<span id="137">137</span>
+<span id="138">138</span>
+<span id="139">139</span>
+<span id="140">140</span>
+<span id="141">141</span>
+<span id="142">142</span>
+<span id="143">143</span>
+<span id="144">144</span>
+<span id="145">145</span>
+<span id="146">146</span>
+<span id="147">147</span>
+<span id="148">148</span>
+<span id="149">149</span>
+<span id="150">150</span>
+<span id="151">151</span>
+<span id="152">152</span>
+<span id="153">153</span>
+<span id="154">154</span>
+<span id="155">155</span>
+<span id="156">156</span>
+<span id="157">157</span>
+<span id="158">158</span>
+<span id="159">159</span>
+<span id="160">160</span>
+<span id="161">161</span>
+<span id="162">162</span>
+<span id="163">163</span>
+<span id="164">164</span>
+<span id="165">165</span>
+<span id="166">166</span>
+<span id="167">167</span>
+<span id="168">168</span>
+<span id="169">169</span>
+<span id="170">170</span>
+<span id="171">171</span>
+<span id="172">172</span>
+<span id="173">173</span>
+<span id="174">174</span>
+<span id="175">175</span>
+<span id="176">176</span>
+<span id="177">177</span>
+<span id="178">178</span>
+<span id="179">179</span>
+<span id="180">180</span>
+<span id="181">181</span>
+<span id="182">182</span>
+<span id="183">183</span>
+<span id="184">184</span>
+<span id="185">185</span>
+<span id="186">186</span>
+<span id="187">187</span>
+<span id="188">188</span>
+<span id="189">189</span>
+<span id="190">190</span>
+<span id="191">191</span>
+<span id="192">192</span>
+<span id="193">193</span>
+<span id="194">194</span>
+<span id="195">195</span>
+<span id="196">196</span>
+<span id="197">197</span>
+<span id="198">198</span>
+<span id="199">199</span>
+<span id="200">200</span>
+<span id="201">201</span>
+<span id="202">202</span>
+<span id="203">203</span>
+<span id="204">204</span>
+<span id="205">205</span>
+<span id="206">206</span>
+<span id="207">207</span>
+<span id="208">208</span>
+<span id="209">209</span>
+<span id="210">210</span>
+<span id="211">211</span>
+<span id="212">212</span>
+<span id="213">213</span>
+<span id="214">214</span>
+<span id="215">215</span>
+<span id="216">216</span>
+<span id="217">217</span>
+<span id="218">218</span>
+<span id="219">219</span>
+<span id="220">220</span>
+<span id="221">221</span>
+<span id="222">222</span>
+<span id="223">223</span>
+<span id="224">224</span>
+<span id="225">225</span>
+<span id="226">226</span>
+<span id="227">227</span>
+<span id="228">228</span>
+<span id="229">229</span>
+<span id="230">230</span>
+<span id="231">231</span>
+<span id="232">232</span>
+<span id="233">233</span>
+<span id="234">234</span>
+<span id="235">235</span>
+<span id="236">236</span>
+<span id="237">237</span>
+<span id="238">238</span>
+<span id="239">239</span>
+<span id="240">240</span>
+<span id="241">241</span>
+<span id="242">242</span>
+<span id="243">243</span>
+<span id="244">244</span>
+<span id="245">245</span>
+<span id="246">246</span>
+<span id="247">247</span>
+<span id="248">248</span>
+<span id="249">249</span>
+<span id="250">250</span>
+<span id="251">251</span>
+<span id="252">252</span>
+<span id="253">253</span>
+<span id="254">254</span>
+<span id="255">255</span>
+<span id="256">256</span>
+<span id="257">257</span>
+<span id="258">258</span>
+<span id="259">259</span>
+<span id="260">260</span>
+<span id="261">261</span>
+<span id="262">262</span>
+<span id="263">263</span>
+<span id="264">264</span>
+<span id="265">265</span>
+<span id="266">266</span>
+<span id="267">267</span>
+<span id="268">268</span>
+<span id="269">269</span>
+<span id="270">270</span>
+<span id="271">271</span>
+<span id="272">272</span>
+<span id="273">273</span>
+<span id="274">274</span>
+<span id="275">275</span>
+<span id="276">276</span>
+<span id="277">277</span>
+<span id="278">278</span>
+<span id="279">279</span>
+<span id="280">280</span>
+<span id="281">281</span>
+<span id="282">282</span>
+<span id="283">283</span>
+<span id="284">284</span>
+<span id="285">285</span>
+<span id="286">286</span>
+<span id="287">287</span>
+<span id="288">288</span>
+<span id="289">289</span>
+<span id="290">290</span>
+<span id="291">291</span>
+<span id="292">292</span>
+<span id="293">293</span>
+<span id="294">294</span>
+<span id="295">295</span>
+<span id="296">296</span>
+<span id="297">297</span>
+<span id="298">298</span>
+<span id="299">299</span>
+<span id="300">300</span>
+<span id="301">301</span>
+<span id="302">302</span>
+<span id="303">303</span>
+<span id="304">304</span>
+<span id="305">305</span>
+<span id="306">306</span>
+<span id="307">307</span>
+<span id="308">308</span>
+<span id="309">309</span>
+<span id="310">310</span>
+<span id="311">311</span>
+<span id="312">312</span>
+<span id="313">313</span>
+<span id="314">314</span>
+<span id="315">315</span>
+<span id="316">316</span>
+<span id="317">317</span>
+<span id="318">318</span>
+<span id="319">319</span>
+<span id="320">320</span>
+<span id="321">321</span>
+<span id="322">322</span>
+<span id="323">323</span>
+<span id="324">324</span>
+<span id="325">325</span>
+<span id="326">326</span>
+<span id="327">327</span>
+<span id="328">328</span>
+<span id="329">329</span>
+<span id="330">330</span>
+<span id="331">331</span>
+<span id="332">332</span>
+<span id="333">333</span>
+<span id="334">334</span>
+<span id="335">335</span>
+<span id="336">336</span>
+<span id="337">337</span>
+<span id="338">338</span>
+<span id="339">339</span>
+<span id="340">340</span>
+<span id="341">341</span>
+<span id="342">342</span>
+<span id="343">343</span>
+<span id="344">344</span>
+<span id="345">345</span>
+<span id="346">346</span>
+<span id="347">347</span>
+<span id="348">348</span>
+<span id="349">349</span>
+<span id="350">350</span>
+<span id="351">351</span>
+<span id="352">352</span>
+<span id="353">353</span>
+<span id="354">354</span>
+<span id="355">355</span>
+<span id="356">356</span>
+<span id="357">357</span>
+<span id="358">358</span>
+<span id="359">359</span>
+<span id="360">360</span>
+<span id="361">361</span>
+<span id="362">362</span>
+<span id="363">363</span>
+<span id="364">364</span>
+<span id="365">365</span>
+<span id="366">366</span>
+<span id="367">367</span>
+<span id="368">368</span>
+<span id="369">369</span>
+<span id="370">370</span>
+<span id="371">371</span>
+<span id="372">372</span>
+<span id="373">373</span>
+<span id="374">374</span>
+<span id="375">375</span>
+<span id="376">376</span>
+<span id="377">377</span>
+<span id="378">378</span>
+<span id="379">379</span>
+<span id="380">380</span>
+<span id="381">381</span>
+<span id="382">382</span>
+<span id="383">383</span>
+<span id="384">384</span>
+<span id="385">385</span>
+<span id="386">386</span>
+<span id="387">387</span>
+<span id="388">388</span>
+<span id="389">389</span>
+<span id="390">390</span>
+<span id="391">391</span>
+<span id="392">392</span>
+<span id="393">393</span>
+<span id="394">394</span>
+<span id="395">395</span>
+<span id="396">396</span>
+<span id="397">397</span>
+<span id="398">398</span>
+<span id="399">399</span>
+<span id="400">400</span>
+<span id="401">401</span>
+<span id="402">402</span>
+<span id="403">403</span>
+<span id="404">404</span>
+<span id="405">405</span>
+<span id="406">406</span>
+<span id="407">407</span>
+<span id="408">408</span>
+<span id="409">409</span>
+<span id="410">410</span>
+<span id="411">411</span>
+<span id="412">412</span>
+<span id="413">413</span>
+<span id="414">414</span>
+<span id="415">415</span>
+<span id="416">416</span>
+<span id="417">417</span>
+<span id="418">418</span>
+<span id="419">419</span>
+<span id="420">420</span>
+<span id="421">421</span>
+<span id="422">422</span>
+<span id="423">423</span>
+<span id="424">424</span>
+<span id="425">425</span>
+<span id="426">426</span>
+<span id="427">427</span>
+<span id="428">428</span>
+<span id="429">429</span>
+<span id="430">430</span>
+<span id="431">431</span>
+<span id="432">432</span>
+<span id="433">433</span>
+<span id="434">434</span>
+<span id="435">435</span>
+<span id="436">436</span>
+<span id="437">437</span>
+<span id="438">438</span>
+<span id="439">439</span>
+<span id="440">440</span>
+<span id="441">441</span>
+<span id="442">442</span>
+<span id="443">443</span>
+<span id="444">444</span>
+<span id="445">445</span>
+<span id="446">446</span>
+<span id="447">447</span>
+<span id="448">448</span>
+<span id="449">449</span>
+<span id="450">450</span>
+<span id="451">451</span>
+<span id="452">452</span>
+<span id="453">453</span>
+<span id="454">454</span>
+<span id="455">455</span>
+<span id="456">456</span>
+<span id="457">457</span>
+<span id="458">458</span>
+<span id="459">459</span>
+<span id="460">460</span>
+<span id="461">461</span>
+<span id="462">462</span>
+<span id="463">463</span>
+<span id="464">464</span>
+<span id="465">465</span>
+<span id="466">466</span>
+<span id="467">467</span>
+<span id="468">468</span>
+<span id="469">469</span>
+<span id="470">470</span>
+<span id="471">471</span>
+<span id="472">472</span>
+<span id="473">473</span>
+<span id="474">474</span>
+<span id="475">475</span>
+<span id="476">476</span>
+<span id="477">477</span>
+<span id="478">478</span>
+<span id="479">479</span>
+<span id="480">480</span>
+<span id="481">481</span>
+<span id="482">482</span>
+<span id="483">483</span>
+<span id="484">484</span>
+<span id="485">485</span>
+<span id="486">486</span>
+<span id="487">487</span>
+<span id="488">488</span>
+<span id="489">489</span>
+<span id="490">490</span>
+<span id="491">491</span>
+<span id="492">492</span>
+<span id="493">493</span>
+<span id="494">494</span>
+<span id="495">495</span>
+<span id="496">496</span>
+<span id="497">497</span>
+<span id="498">498</span>
+<span id="499">499</span>
+<span id="500">500</span>
+<span id="501">501</span>
+<span id="502">502</span>
+<span id="503">503</span>
+<span id="504">504</span>
+<span id="505">505</span>
+<span id="506">506</span>
+<span id="507">507</span>
+<span id="508">508</span>
+<span id="509">509</span>
+<span id="510">510</span>
+<span id="511">511</span>
+<span id="512">512</span>
+<span id="513">513</span>
+<span id="514">514</span>
+<span id="515">515</span>
+<span id="516">516</span>
+<span id="517">517</span>
+<span id="518">518</span>
+<span id="519">519</span>
+<span id="520">520</span>
+<span id="521">521</span>
+<span id="522">522</span>
+<span id="523">523</span>
+<span id="524">524</span>
+<span id="525">525</span>
+<span id="526">526</span>
+<span id="527">527</span>
+<span id="528">528</span>
+<span id="529">529</span>
+<span id="530">530</span>
+<span id="531">531</span>
+<span id="532">532</span>
+<span id="533">533</span>
+<span id="534">534</span>
+<span id="535">535</span>
+<span id="536">536</span>
+<span id="537">537</span>
+<span id="538">538</span>
+<span id="539">539</span>
+<span id="540">540</span>
+<span id="541">541</span>
+<span id="542">542</span>
+<span id="543">543</span>
+<span id="544">544</span>
+<span id="545">545</span>
+<span id="546">546</span>
+<span id="547">547</span>
+<span id="548">548</span>
+<span id="549">549</span>
+<span id="550">550</span>
+<span id="551">551</span>
+<span id="552">552</span>
+<span id="553">553</span>
+<span id="554">554</span>
+<span id="555">555</span>
+<span id="556">556</span>
+<span id="557">557</span>
+<span id="558">558</span>
+<span id="559">559</span>
+<span id="560">560</span>
+<span id="561">561</span>
+<span id="562">562</span>
+<span id="563">563</span>
+<span id="564">564</span>
+<span id="565">565</span>
+<span id="566">566</span>
+<span id="567">567</span>
+<span id="568">568</span>
+<span id="569">569</span>
+<span id="570">570</span>
+<span id="571">571</span>
+<span id="572">572</span>
+<span id="573">573</span>
+<span id="574">574</span>
+<span id="575">575</span>
+<span id="576">576</span>
+<span id="577">577</span>
+<span id="578">578</span>
+<span id="579">579</span>
+<span id="580">580</span>
+<span id="581">581</span>
+<span id="582">582</span>
+<span id="583">583</span>
+<span id="584">584</span>
+<span id="585">585</span>
+<span id="586">586</span>
+<span id="587">587</span>
+<span id="588">588</span>
+<span id="589">589</span>
+</pre><div class="example-wrap"><pre class="rust ">
+<span class="doccomment">//! The management of a process&#39; memory</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! ```</span>
+<span class="doccomment">//! j-------------------------------j j---------------------j</span>
+<span class="doccomment">//! |        Process Memory         | |    Kernel Memory    |</span>
+<span class="doccomment">//! j-------------------------------j j---------------------j</span>
+<span class="doccomment">//!                 |                            |</span>
+<span class="doccomment">//!     j-----------------------j                |</span>
+<span class="doccomment">//!     | Userspace Bookkeeping |                |</span>
+<span class="doccomment">//!     j-----------------------j                |</span>
+<span class="doccomment">//!                 |                            |</span>
+<span class="doccomment">//! j--------------------------------+----------------~-----j</span>
+<span class="doccomment">//! |           User Land            |   Kernel Land  | RTL |</span>
+<span class="doccomment">//! j--------------------------------+----------------~-----j</span>
+<span class="doccomment">//!                         Page tables</span>
+<span class="doccomment">//! ```</span>
+
+<span class="kw">pub</span> <span class="kw">use</span> <span class="kw">super</span>::<span class="ident">bookkeeping</span>::<span class="ident">QueryMemory</span>;
+
+<span class="kw">use</span> <span class="kw">super</span>::<span class="ident">hierarchical_table</span>::<span class="kw-2">*</span>;
+<span class="kw">use</span> <span class="kw">super</span>::<span class="ident">arch</span>::{<span class="ident">PAGE_SIZE</span>, <span class="ident">InactiveHierarchy</span>, <span class="ident">ActiveHierarchy</span>};
+<span class="kw">use</span> <span class="kw">super</span>::<span class="ident">lands</span>::{<span class="ident">UserLand</span>, <span class="ident">VirtualSpaceLand</span>};
+<span class="kw">use</span> <span class="kw">super</span>::<span class="ident">bookkeeping</span>::<span class="ident">UserspaceBookkeeping</span>;
+<span class="kw">use</span> <span class="kw">super</span>::<span class="ident">mapping</span>::{<span class="ident">Mapping</span>, <span class="ident">MappingFrames</span>};
+<span class="kw">use</span> <span class="ident">sunrise_libkern</span>::{<span class="ident">MemoryType</span>, <span class="ident">MemoryState</span>, <span class="ident">MemoryAttributes</span>, <span class="ident">MemoryPermissions</span>};
+<span class="kw">use</span> <span class="kw">super</span>::<span class="ident">cross_process</span>::<span class="ident">CrossProcessMapping</span>;
+<span class="kw">use</span> <span class="kw">super</span>::<span class="ident">MappingAccessRights</span>;
+<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">mem</span>::{<span class="ident">VirtualAddress</span>, <span class="ident">PhysicalAddress</span>};
+<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">frame_allocator</span>::{<span class="ident">FrameAllocator</span>, <span class="ident">FrameAllocatorTrait</span>, <span class="ident">PhysicalMemRegion</span>};
+<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">paging</span>::<span class="ident">arch</span>::<span class="ident">Entry</span>;
+<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">error</span>::<span class="ident">KernelError</span>;
+<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">utils</span>::{<span class="ident">check_size_aligned</span>, <span class="ident">check_nonzero_length</span>};
+<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">sync</span>::<span class="ident">SpinRwLock</span>;
+<span class="kw">use</span> <span class="ident">alloc</span>::{<span class="ident">vec</span>::<span class="ident">Vec</span>, <span class="ident">sync</span>::<span class="ident">Arc</span>};
+<span class="kw">use</span> <span class="ident">failure</span>::<span class="ident">Backtrace</span>;
+
+<span class="doccomment">/// The struct representing a process&#39; memory, stored in the ProcessStruct behind a lock.</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// We always store the table_hierarchy as an inactive hierarchy, and use a shortcut function</span>
+<span class="doccomment">/// accessing ActiveHierarchy instead if we detect it&#39;s the same cr3 as the currently active one.</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// A process is the only owner of a ProcessMemory</span>
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
+<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">ProcessMemory</span> {
+    <span class="doccomment">/// The list of mappings in this address space.</span>
+    <span class="ident">userspace_bookkeping</span>: <span class="ident">UserspaceBookkeeping</span>,
+    <span class="doccomment">/// The architecture-dependent paging hierarchy.</span>
+    <span class="ident">table_hierarchy</span>: <span class="ident">InactiveHierarchy</span>,
+    <span class="doccomment">/// The start of the heap of this process. The heap is managed as a brk</span>
+    <span class="doccomment">/// by the [set_heap_size] syscall.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// The location of each process&#39;s heap should be random, to implement ASLR.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// [set_heap_size]: crate::syscalls::set_heap_size</span>
+    <span class="ident">heap_base_address</span>: <span class="ident">VirtualAddress</span>,
+}
+
+<span class="doccomment">/// Page tables selector.</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// A process always stores its table_hierarchy as an inactive hierarchy. When it wants to modify</span>
+<span class="doccomment">/// its page tables, it will first call [`get_hierarchy`], which will detect if the hierarchy</span>
+<span class="doccomment">/// is already the currently active one, and return a `DynamicHierarchy`.</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// This returned `DynamicHierarchy` is just a wrapper which will dispatch all its calls to the right</span>
+<span class="doccomment">/// hierarchy, either the already active one, shortcutting the method calls by not having to map</span>
+<span class="doccomment">/// temporary directories and page tables, or going the long way and actually use the inactive one.</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// [`get_hierarchy`]: self::ProcessMemory::get_hierarchy</span>
+<span class="kw">enum</span> <span class="ident">DynamicHierarchy</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> {
+    <span class="doccomment">/// The process&#39;s hierarchy is already the currently active one.</span>
+    <span class="ident">Active</span>(<span class="ident">ActiveHierarchy</span>),
+    <span class="doccomment">/// The process&#39;s hierarchy an inactive one.</span>
+    <span class="ident">Inactive</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="kw-2">mut</span> <span class="ident">InactiveHierarchy</span>)
+}
+
+<span class="kw">impl</span> <span class="ident">HierarchicalTable</span> <span class="kw">for</span> () {
+    <span class="kw">type</span> <span class="ident">EntryType</span> <span class="op">=</span> <span class="ident">Entry</span>;
+    <span class="kw">type</span> <span class="ident">CacheFlusherType</span> <span class="op">=</span> <span class="ident">NoFlush</span>;
+    <span class="kw">type</span> <span class="ident">ChildTableType</span> <span class="op">=</span> ();
+
+    <span class="kw">fn</span> <span class="ident">entries</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="kw-2">mut</span> [<span class="ident">Entry</span>] {
+        <span class="macro">unimplemented</span><span class="macro">!</span>()
+    }
+
+    <span class="kw">fn</span> <span class="ident">table_level</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {
+        <span class="macro">unimplemented</span><span class="macro">!</span>()
+    }
+
+    <span class="kw">fn</span> <span class="ident">get_child_table</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">_index</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">PageState</span><span class="op">&lt;</span><span class="ident">SmartHierarchicalTable</span><span class="op">&lt;</span><span class="op">&lt;</span><span class="self">Self</span> <span class="kw">as</span> <span class="ident">HierarchicalTable</span><span class="op">&gt;</span>::<span class="ident">ChildTableType</span><span class="op">&gt;</span><span class="op">&gt;</span> {
+        <span class="macro">unimplemented</span><span class="macro">!</span>()
+    }
+
+    <span class="kw">fn</span> <span class="ident">create_child_table</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">_index</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">SmartHierarchicalTable</span><span class="op">&lt;</span><span class="op">&lt;</span><span class="self">Self</span> <span class="kw">as</span> <span class="ident">HierarchicalTable</span><span class="op">&gt;</span>::<span class="ident">ChildTableType</span><span class="op">&gt;</span> {
+        <span class="macro">unimplemented</span><span class="macro">!</span>()
+    }
+}
+
+<span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;b</span><span class="op">&gt;</span> <span class="ident">TableHierarchy</span> <span class="kw">for</span> <span class="ident">DynamicHierarchy</span><span class="op">&lt;</span><span class="lifetime">&#39;b</span><span class="op">&gt;</span> {
+    <span class="kw">type</span> <span class="ident">TopLevelTableType</span> <span class="op">=</span> (); <span class="comment">// Ignored</span>
+
+    <span class="kw">fn</span> <span class="ident">get_top_level_table</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">SmartHierarchicalTable</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
+        <span class="macro">panic</span><span class="macro">!</span>(<span class="string">&quot;Dynamic DynamicHierarchy reimplements everything&quot;</span>);
+    }
+
+    <span class="kw">fn</span> <span class="ident">map_to_from_iterator</span><span class="op">&lt;</span><span class="ident">I</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>,
+                               <span class="ident">frames_iterator</span>: <span class="ident">I</span>,
+                               <span class="ident">start_address</span>: <span class="ident">VirtualAddress</span>,
+                               <span class="ident">flags</span>: <span class="ident">MappingAccessRights</span>)
+    <span class="kw">where</span> <span class="ident">I</span>: <span class="ident">Iterator</span><span class="op">&lt;</span><span class="ident">Item</span><span class="op">=</span><span class="ident">PhysicalAddress</span><span class="op">&gt;</span>
+    {
+        <span class="kw">match</span> <span class="kw-2">*</span><span class="self">self</span> {
+            <span class="ident">DynamicHierarchy</span>::<span class="ident">Active</span>(<span class="kw-2">ref</span> <span class="kw-2">mut</span> <span class="ident">hierarchy</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">hierarchy</span>.<span class="ident">map_to_from_iterator</span>(<span class="ident">frames_iterator</span>, <span class="ident">start_address</span>, <span class="ident">flags</span>),
+            <span class="ident">DynamicHierarchy</span>::<span class="ident">Inactive</span>(<span class="kw-2">ref</span> <span class="kw-2">mut</span> <span class="ident">hierarchy</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">hierarchy</span>.<span class="ident">map_to_from_iterator</span>(<span class="ident">frames_iterator</span>, <span class="ident">start_address</span>, <span class="ident">flags</span>),
+        }
+    }
+
+    <span class="kw">fn</span> <span class="ident">guard</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">address</span>: <span class="ident">VirtualAddress</span>, <span class="ident">length</span>: <span class="ident">usize</span>) {
+        <span class="kw">match</span> <span class="kw-2">*</span><span class="self">self</span> {
+            <span class="ident">DynamicHierarchy</span>::<span class="ident">Active</span>(<span class="kw-2">ref</span> <span class="kw-2">mut</span> <span class="ident">hierarchy</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">hierarchy</span>.<span class="ident">guard</span>(<span class="ident">address</span>, <span class="ident">length</span>),
+            <span class="ident">DynamicHierarchy</span>::<span class="ident">Inactive</span>(<span class="kw-2">ref</span> <span class="kw-2">mut</span> <span class="ident">hierarchy</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">hierarchy</span>.<span class="ident">guard</span>(<span class="ident">address</span>, <span class="ident">length</span>),
+        }
+    }
+
+    <span class="kw">fn</span> <span class="ident">unmap</span><span class="op">&lt;</span><span class="ident">C</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">address</span>: <span class="ident">VirtualAddress</span>, <span class="ident">length</span>: <span class="ident">usize</span>, <span class="ident">callback</span>: <span class="ident">C</span>) <span class="kw">where</span> <span class="ident">C</span>: <span class="ident">FnMut</span>(<span class="ident">PhysicalAddress</span>) {
+        <span class="kw">match</span> <span class="kw-2">*</span><span class="self">self</span> {
+            <span class="ident">DynamicHierarchy</span>::<span class="ident">Active</span>(<span class="kw-2">ref</span> <span class="kw-2">mut</span> <span class="ident">hierarchy</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">hierarchy</span>.<span class="ident">unmap</span>(<span class="ident">address</span>, <span class="ident">length</span>, <span class="ident">callback</span>),
+            <span class="ident">DynamicHierarchy</span>::<span class="ident">Inactive</span>(<span class="kw-2">ref</span> <span class="kw-2">mut</span> <span class="ident">hierarchy</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">hierarchy</span>.<span class="ident">unmap</span>(<span class="ident">address</span>, <span class="ident">length</span>, <span class="ident">callback</span>),
+        }
+    }
+
+    <span class="kw">fn</span> <span class="ident">for_every_entry</span><span class="op">&lt;</span><span class="ident">C</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">address</span>: <span class="ident">VirtualAddress</span>, <span class="ident">length</span>: <span class="ident">usize</span>, <span class="ident">callback</span>: <span class="ident">C</span>) <span class="kw">where</span> <span class="ident">C</span>: <span class="ident">FnMut</span>(<span class="ident">PageState</span><span class="op">&lt;</span><span class="ident">PhysicalAddress</span><span class="op">&gt;</span>, <span class="ident">usize</span>) {
+        <span class="kw">match</span> <span class="kw-2">*</span><span class="self">self</span> {
+            <span class="ident">DynamicHierarchy</span>::<span class="ident">Active</span>(<span class="kw-2">ref</span> <span class="kw-2">mut</span> <span class="ident">hierarchy</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">hierarchy</span>.<span class="ident">for_every_entry</span>(<span class="ident">address</span>, <span class="ident">length</span>, <span class="ident">callback</span>),
+            <span class="ident">DynamicHierarchy</span>::<span class="ident">Inactive</span>(<span class="kw-2">ref</span> <span class="kw-2">mut</span> <span class="ident">hierarchy</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">hierarchy</span>.<span class="ident">for_every_entry</span>(<span class="ident">address</span>, <span class="ident">length</span>, <span class="ident">callback</span>),
+        }
+    }
+
+    <span class="kw">fn</span> <span class="ident">find_available_virtual_space_aligned</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">length</span>: <span class="ident">usize</span>, <span class="ident">start_addr</span>: <span class="ident">VirtualAddress</span>, <span class="ident">end_addr</span>: <span class="ident">VirtualAddress</span>, <span class="ident">alignment</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">VirtualAddress</span><span class="op">&gt;</span> {
+        <span class="kw">match</span> <span class="kw-2">*</span><span class="self">self</span> {
+            <span class="ident">DynamicHierarchy</span>::<span class="ident">Active</span>(<span class="kw-2">ref</span> <span class="kw-2">mut</span> <span class="ident">hierarchy</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">hierarchy</span>.<span class="ident">find_available_virtual_space_aligned</span>(<span class="ident">length</span>, <span class="ident">start_addr</span>, <span class="ident">end_addr</span>, <span class="ident">alignment</span>),
+            <span class="ident">DynamicHierarchy</span>::<span class="ident">Inactive</span>(<span class="kw-2">ref</span> <span class="kw-2">mut</span> <span class="ident">hierarchy</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">hierarchy</span>.<span class="ident">find_available_virtual_space_aligned</span>(<span class="ident">length</span>, <span class="ident">start_addr</span>, <span class="ident">end_addr</span>, <span class="ident">alignment</span>),
+        }
+    }
+}
+
+<span class="kw">impl</span> <span class="ident">Default</span> <span class="kw">for</span> <span class="ident">ProcessMemory</span> {
+    <span class="doccomment">/// Creates a ProcessMemory, allocating the userspace-bookkeeping,</span>
+    <span class="doccomment">/// and the top-level table of the table hierarchy.</span>
+    <span class="kw">fn</span> <span class="ident">default</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
+        <span class="comment">// we don&#39;t have ASRL yet :(</span>
+        <span class="kw">let</span> <span class="ident">heap_base_address</span> <span class="op">=</span> <span class="ident">VirtualAddress</span>(<span class="number">0x80000000</span>);
+
+        <span class="ident">ProcessMemory</span> {
+            <span class="ident">userspace_bookkeping</span>: <span class="ident">UserspaceBookkeeping</span>::<span class="ident">new</span>(),
+            <span class="ident">table_hierarchy</span>: <span class="ident">InactiveHierarchy</span>::<span class="ident">new</span>(),
+            <span class="ident">heap_base_address</span>,
+        }
+    }
+}
+
+<span class="kw">impl</span> <span class="ident">ProcessMemory</span> {
+
+    <span class="doccomment">/// If these tables are the one currently in use, we return them as an ActiveHierarchy instead.</span>
+    <span class="kw">fn</span> <span class="ident">get_hierarchy</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">DynamicHierarchy</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span> {
+        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">table_hierarchy</span>.<span class="ident">is_currently_active</span>() {
+            <span class="kw">unsafe</span> {
+                <span class="comment">// safe because the lock in the ProcessStuct is held, and there is no other safe way</span>
+                <span class="comment">// of getting a mut ref to the ActiveHierarchy</span>
+                <span class="ident">DynamicHierarchy</span>::<span class="ident">Active</span>(<span class="ident">ActiveHierarchy</span>)
+            }
+        } <span class="kw">else</span> {
+            <span class="ident">DynamicHierarchy</span>::<span class="ident">Inactive</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>.<span class="ident">table_hierarchy</span>)
+        }
+    }
+
+    <span class="doccomment">/// Maps a single physical regions to a given virtual address.</span>
+    <span class="doccomment">/// Used to map mmio regions in UserSpace.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// # Errors</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// * `InvalidAddress`:</span>
+    <span class="doccomment">///     * there was already a mapping in the range.</span>
+    <span class="doccomment">///     * range does not fall in UserLand.</span>
+    <span class="doccomment">///     * `address` is not page aligned.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">map_phys_region_to</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>,
+                              <span class="ident">phys</span>: <span class="ident">PhysicalMemRegion</span>,
+                              <span class="ident">address</span>: <span class="ident">VirtualAddress</span>,
+                              <span class="ident">ty</span>: <span class="ident">MemoryType</span>,
+                              <span class="ident">flags</span>: <span class="ident">MappingAccessRights</span>)
+                              <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident">KernelError</span><span class="op">&gt;</span> {
+        <span class="ident">address</span>.<span class="ident">check_aligned_to</span>(<span class="ident">PAGE_SIZE</span>)<span class="question-mark">?</span>;
+        <span class="kw">let</span> <span class="ident">length</span> <span class="op">=</span> <span class="ident">phys</span>.<span class="ident">size</span>();
+        <span class="ident">UserLand</span>::<span class="ident">check_contains_region</span>(<span class="ident">address</span>, <span class="ident">length</span>)<span class="question-mark">?</span>;
+        <span class="self">self</span>.<span class="ident">userspace_bookkeping</span>.<span class="ident">check_vacant</span>(<span class="ident">address</span>, <span class="ident">length</span>)<span class="question-mark">?</span>;
+        <span class="comment">// ok, everything seems good, from now on treat errors as unexpected</span>
+
+        <span class="self">self</span>.<span class="ident">get_hierarchy</span>().<span class="ident">map_to_from_iterator</span>(<span class="ident">phys</span>.<span class="ident">into_iter</span>(), <span class="ident">address</span>, <span class="ident">flags</span>);
+        <span class="kw">let</span> <span class="ident">mapping</span> <span class="op">=</span> <span class="ident">Mapping</span>::<span class="ident">new</span>(<span class="ident">address</span>, <span class="ident">MappingFrames</span>::<span class="ident">Owned</span>(<span class="macro">vec</span><span class="macro">!</span>[<span class="ident">phys</span>]), <span class="number">0</span>, <span class="ident">length</span>, <span class="ident">ty</span>, <span class="ident">flags</span>)
+            .<span class="ident">expect</span>(<span class="string">&quot;We checked everything, but bookkeeping refuses to create the mapping&quot;</span>);
+        <span class="self">self</span>.<span class="ident">userspace_bookkeping</span>.<span class="ident">add_mapping</span>(<span class="ident">mapping</span>)
+            .<span class="ident">expect</span>(<span class="string">&quot;We checked everything, but bookkeeping refuses to add the mapping&quot;</span>);
+        <span class="prelude-val">Ok</span>(())
+    }
+
+    <span class="doccomment">/// Allocates the physical regions, and maps them to specified address.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// # Errors</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// * `InvalidAddress`:</span>
+    <span class="doccomment">///     * there was already a mapping in the range.</span>
+    <span class="doccomment">///     * range does not fall in UserLand.</span>
+    <span class="doccomment">///     * `address` is not page aligned.</span>
+    <span class="doccomment">/// * `InvalidSize` :</span>
+    <span class="doccomment">///     * `length` is not page aligned.</span>
+    <span class="doccomment">///     * `length` is 0.</span>
+    <span class="doccomment">/// * `PhysicalMemoryExhaustion`: Frames could not be allocated.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">create_regular_mapping</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">address</span>: <span class="ident">VirtualAddress</span>, <span class="ident">length</span>: <span class="ident">usize</span>, <span class="ident">ty</span>: <span class="ident">MemoryType</span>, <span class="ident">flags</span>: <span class="ident">MappingAccessRights</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident">KernelError</span><span class="op">&gt;</span> {
+        <span class="ident">address</span>.<span class="ident">check_aligned_to</span>(<span class="ident">PAGE_SIZE</span>)<span class="question-mark">?</span>;
+        <span class="ident">check_size_aligned</span>(<span class="ident">length</span>, <span class="ident">PAGE_SIZE</span>)<span class="question-mark">?</span>;
+        <span class="ident">check_nonzero_length</span>(<span class="ident">length</span>)<span class="question-mark">?</span>;
+        <span class="ident">UserLand</span>::<span class="ident">check_contains_region</span>(<span class="ident">address</span>, <span class="ident">length</span>)<span class="question-mark">?</span>;
+        <span class="self">self</span>.<span class="ident">userspace_bookkeping</span>.<span class="ident">check_vacant</span>(<span class="ident">address</span>, <span class="ident">length</span>)<span class="question-mark">?</span>;
+        <span class="kw">let</span> <span class="ident">frames</span> <span class="op">=</span> <span class="ident">FrameAllocator</span>::<span class="ident">allocate_frames_fragmented</span>(<span class="ident">length</span>)<span class="question-mark">?</span>;
+        <span class="comment">// ok, everything seems good, from now on treat errors as unexpected</span>
+
+        <span class="self">self</span>.<span class="ident">get_hierarchy</span>().<span class="ident">map_to_from_iterator</span>(<span class="ident">frames</span>.<span class="ident">iter</span>().<span class="ident">flatten</span>(), <span class="ident">address</span>, <span class="ident">flags</span>);
+        <span class="kw">let</span> <span class="ident">frames</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">ty</span>.<span class="ident">get_memory_state</span>().<span class="ident">contains</span>(<span class="ident">MemoryState</span>::<span class="ident">IS_REFERENCE_COUNTED</span>) {
+            <span class="ident">MappingFrames</span>::<span class="ident">Shared</span>(<span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">SpinRwLock</span>::<span class="ident">new</span>(<span class="ident">frames</span>)))
+        } <span class="kw">else</span> {
+            <span class="ident">MappingFrames</span>::<span class="ident">Owned</span>(<span class="ident">frames</span>)
+        };
+
+        <span class="kw">let</span> <span class="ident">mapping</span> <span class="op">=</span> <span class="ident">Mapping</span>::<span class="ident">new</span>(<span class="ident">address</span>, <span class="ident">frames</span>, <span class="number">0</span>, <span class="ident">length</span>, <span class="ident">ty</span>, <span class="ident">flags</span>)
+            .<span class="ident">expect</span>(<span class="string">&quot;We checked everything, but bookkeeping refuses to create the mapping&quot;</span>);
+        <span class="self">self</span>.<span class="ident">userspace_bookkeping</span>.<span class="ident">add_mapping</span>(<span class="ident">mapping</span>)
+            .<span class="ident">expect</span>(<span class="string">&quot;We checked everything, but bookkeeping refuses to add the mapping&quot;</span>);
+        <span class="prelude-val">Ok</span>(())
+    }
+
+    <span class="doccomment">/// Maps a previously created shared mapping to specified address.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// # Errors</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// * `InvalidAddress`:</span>
+    <span class="doccomment">///     * there was already a mapping in the range.</span>
+    <span class="doccomment">///     * range does not fall in UserLand.</span>
+    <span class="doccomment">///     * `address` is not page aligned.</span>
+    <span class="doccomment">/// * `InvalidSize` :</span>
+    <span class="doccomment">///     * `length` is not page aligned.</span>
+    <span class="doccomment">///     * `length` is 0.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">map_partial_shared_mapping</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>,
+                                      <span class="ident">shared_mapping</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">SpinRwLock</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">PhysicalMemRegion</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+                                      <span class="ident">address</span>: <span class="ident">VirtualAddress</span>,
+                                      <span class="ident">phys_offset</span>: <span class="ident">usize</span>,
+                                      <span class="ident">length</span>: <span class="ident">usize</span>,
+                                      <span class="ident">ty</span>: <span class="ident">MemoryType</span>,
+                                      <span class="ident">flags</span>: <span class="ident">MappingAccessRights</span>)
+                                     <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident">KernelError</span><span class="op">&gt;</span> {
+        <span class="ident">address</span>.<span class="ident">check_aligned_to</span>(<span class="ident">PAGE_SIZE</span>)<span class="question-mark">?</span>;
+        <span class="ident">check_nonzero_length</span>(<span class="ident">length</span>)<span class="question-mark">?</span>;
+        <span class="ident">check_size_aligned</span>(<span class="ident">length</span>, <span class="ident">PAGE_SIZE</span>)<span class="question-mark">?</span>;
+        <span class="kw">let</span> <span class="ident">max_length</span> <span class="op">=</span> <span class="ident">shared_mapping</span>.<span class="ident">read</span>().<span class="ident">iter</span>().<span class="ident">flatten</span>().<span class="ident">count</span>() <span class="op">*</span> <span class="ident">PAGE_SIZE</span> <span class="op">-</span> <span class="ident">phys_offset</span>;
+        <span class="kw">if</span> <span class="ident">max_length</span> <span class="op">&lt;</span> <span class="ident">length</span> {
+            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">KernelError</span>::<span class="ident">InvalidSize</span> { <span class="ident">size</span>: <span class="ident">length</span>, <span class="ident">backtrace</span>: <span class="ident">Backtrace</span>::<span class="ident">new</span>() })
+        }
+        <span class="ident">UserLand</span>::<span class="ident">check_contains_region</span>(<span class="ident">address</span>, <span class="ident">length</span>)<span class="question-mark">?</span>;
+        <span class="self">self</span>.<span class="ident">userspace_bookkeping</span>.<span class="ident">check_vacant</span>(<span class="ident">address</span>, <span class="ident">length</span>)<span class="question-mark">?</span>;
+        <span class="comment">// ok, everything seems good, from now on treat errors as unexpected</span>
+
+        <span class="kw">let</span> <span class="ident">mapping</span> <span class="op">=</span> <span class="ident">Mapping</span>::<span class="ident">new</span>(<span class="ident">address</span>, <span class="ident">MappingFrames</span>::<span class="ident">Shared</span>(<span class="ident">shared_mapping</span>), <span class="ident">phys_offset</span>, <span class="ident">length</span>, <span class="ident">ty</span>, <span class="ident">flags</span>)
+            .<span class="ident">expect</span>(<span class="string">&quot;We checked everything, but bookkeeping refuses to create the mapping&quot;</span>);
+        <span class="self">self</span>.<span class="ident">get_hierarchy</span>().<span class="ident">map_to_from_iterator</span>(<span class="ident">mapping</span>.<span class="ident">frames_it</span>(), <span class="ident">address</span>, <span class="ident">flags</span>);
+        <span class="self">self</span>.<span class="ident">userspace_bookkeping</span>.<span class="ident">add_mapping</span>(<span class="ident">mapping</span>)
+            .<span class="ident">expect</span>(<span class="string">&quot;We checked everything, but bookkeeping refuses to add the mapping&quot;</span>);
+        <span class="prelude-val">Ok</span>(())
+    }
+
+    <span class="doccomment">/// Guards a range of addresses</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// # Errors</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// * `InvalidAddress`:</span>
+    <span class="doccomment">///     * there was already a mapping in the range.</span>
+    <span class="doccomment">///     * range does not fall in UserLand.</span>
+    <span class="doccomment">///     * `address` is not page aligned.</span>
+    <span class="doccomment">/// * `InvalidSize` :</span>
+    <span class="doccomment">///     * `length` is not page aligned.</span>
+    <span class="doccomment">///     * `length` is 0.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">guard</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">address</span>: <span class="ident">VirtualAddress</span>, <span class="ident">length</span>: <span class="ident">usize</span>, <span class="ident">ty</span>: <span class="ident">MemoryType</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident">KernelError</span><span class="op">&gt;</span>{
+        <span class="ident">UserLand</span>::<span class="ident">check_contains_region</span>(<span class="ident">address</span>, <span class="ident">length</span>)<span class="question-mark">?</span>;
+        <span class="kw">let</span> <span class="ident">mapping</span> <span class="op">=</span> <span class="ident">Mapping</span>::<span class="ident">new</span>(<span class="ident">address</span>, <span class="ident">MappingFrames</span>::<span class="prelude-val">None</span>, <span class="number">0</span>, <span class="ident">length</span>, <span class="ident">ty</span>, <span class="ident">MappingAccessRights</span>::<span class="ident">empty</span>())<span class="question-mark">?</span>;
+        <span class="self">self</span>.<span class="ident">userspace_bookkeping</span>.<span class="ident">add_mapping</span>(<span class="ident">mapping</span>)<span class="question-mark">?</span>;
+
+        <span class="comment">// everything is ok, actually map the guard</span>
+        <span class="self">self</span>.<span class="ident">get_hierarchy</span>().<span class="ident">guard</span>(<span class="ident">address</span>, <span class="ident">length</span>);
+        <span class="prelude-val">Ok</span>(())
+    }
+
+    <span class="doccomment">/// Deletes a mapping in the page tables.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// This function will never split an existing mapping, thus address and length must match exactly.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// If the range maps physical memory, it will be de-allocated.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// # Errors</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// * `InvalidAddress`:</span>
+    <span class="doccomment">///     * there was no mapping starting at `address`.</span>
+    <span class="doccomment">///     * range does not fall in UserLand.</span>
+    <span class="doccomment">/// * `InvalidSize`:</span>
+    <span class="doccomment">///     * `length` is not the size of the mapping at `address`.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">unmap</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">address</span>: <span class="ident">VirtualAddress</span>, <span class="ident">length</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Mapping</span>, <span class="ident">KernelError</span><span class="op">&gt;</span> {
+        <span class="ident">UserLand</span>::<span class="ident">check_contains_region</span>(<span class="ident">address</span>, <span class="ident">length</span>)<span class="question-mark">?</span>;
+        <span class="comment">// allow address and length to be unaligned, remove_mapping will just not find anything.</span>
+        <span class="kw">let</span> <span class="ident">mapping</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">userspace_bookkeping</span>.<span class="ident">remove_mapping</span>(<span class="ident">address</span>, <span class="ident">length</span>)<span class="question-mark">?</span>;
+        <span class="self">self</span>.<span class="ident">get_hierarchy</span>().<span class="ident">unmap</span>(<span class="ident">address</span>, <span class="ident">length</span>, <span class="op">|</span><span class="kw">_</span><span class="op">|</span> {
+            <span class="comment">/* leak the mapped frames here, we still have them in `mapping` */</span>
+        });
+        <span class="prelude-val">Ok</span>(<span class="ident">mapping</span>)
+    }
+
+    <span class="doccomment">/// Reads the state of the mapping at a given address.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">query_memory</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">address</span>: <span class="ident">VirtualAddress</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">QueryMemory</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span> {
+        <span class="self">self</span>.<span class="ident">userspace_bookkeping</span>.<span class="ident">mapping_at</span>(<span class="ident">address</span>)
+    }
+
+    <span class="comment">/*/// Shrink the mapping at `address` to `new_size`.
+    ///
+    /// If `new_size` == 0, the mapping is unmapped entirely.
+    ///
+    /// The removed part is returned, it is no longer mapped.
+    ///
+    /// If `new_size` is equal to old size, nothing is done, and Ok(None) is returned.
+    ///
+    /// Because it is reference counted, a Shared mapping cannot be resized.
+    ///
+    /// # Errors
+    ///
+    /// * `InvalidAddress`:
+    ///     * No mapping was found starting at `address`.
+    /// * `InvalidSize`:
+    ///     * `new_size` &gt; previous mapping length.
+    ///     * `new_size` is not PAGE_SIZE aligned.
+    ///
+    /// * SharedMapping if `address` falls in a shared mapping.
+    /// * InvalidMapping if `address` falls in a system reserved mapping.
+    // todo shrink_mapping seems extremely fishy
+    // body I should check everything is right with its return types and early returns.
+    // body It should at least check early for Shared and SystemReserved mappings.
+    pub fn shrink_mapping(&amp;mut self, address: VirtualAddress, new_size: usize) -&gt; Result&lt;Option&lt;Mapping&gt;, KernelError&gt; {
+        check_size_aligned(new_size, PAGE_SIZE)?;
+        // 1. get the previous mapping&#39;s address and size.
+        let (start_addr, old_size) = {
+            let old_mapping_ref = self.userspace_bookkeping.occupied_mapping_at(address)?;
+            (old_mapping_ref.address(), old_mapping_ref.length())
+        };
+        if new_size == 0 {
+            // remove the mapping entirely, return everything as spill.
+            return self.unmap(start_addr, old_size).map(Some)
+        }
+        if new_size == old_size {
+            // don&#39;t do anything, and produce no spill
+            return Ok(None)
+        }
+        if new_size &gt; old_size {
+            return Err(KernelError::InvalidSize { size: new_size, backtrace: Backtrace::new() });
+        }
+        // 2. remove it from the bookkeeping
+        let mut mapping = self.userspace_bookkeping.remove_mapping(start_addr, old_size)
+            .expect(&quot;shrink_mapping: removing the mapping failed.&quot;);
+        // 3. split it in two
+        let spill = mapping.split_at(new_size)?
+            .expect(&quot;shrink_mapping: shrinking did not produce a right part, but new size &lt; old size&quot;);
+        // 4. re-add the left part
+        self.userspace_bookkeping.add_mapping(mapping)
+            .expect(&quot;shrink_mapping: re-adding the mapping failed&quot;);
+        // 5. unmap the right part from the page_tables
+        self.get_hierarchy().unmap(spill.address(), spill.length(), |_| {
+            /* leak the mapped frames here, we still have them in `mapping` */
+        });
+        Ok(Some(spill))
+    }*/</span>
+
+    <span class="doccomment">/// Expand the Heap at `address` to `new_size`.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// New frames are allocated to match `new_size`.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// If `new_size` is equal to old size, nothing is done.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// # Errors</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// * `InvalidAddress`:</span>
+    <span class="doccomment">///     * There was already a mapping in the range `address..(address + new_size)`.</span>
+    <span class="doccomment">///     * `address` does not match any existent mapping.</span>
+    <span class="doccomment">///     * `address` falls in a shared or system reserved mapping, which cannot be resized.</span>
+    <span class="doccomment">/// * `InvalidSize`:</span>
+    <span class="doccomment">///     * `address..(address + new_size)` does not fall in UserLand.</span>
+    <span class="doccomment">///     * `new_size` &lt; previous mapping length.</span>
+    <span class="doccomment">///     * `new_size` is not page aligned.</span>
+    <span class="doccomment">/// * `InvalidMemState`:</span>
+    <span class="doccomment">///     * `address` does not point to a Heap memory mapping.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">expand_mapping</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">address</span>: <span class="ident">VirtualAddress</span>, <span class="ident">new_size</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident">KernelError</span><span class="op">&gt;</span> {
+        <span class="ident">check_size_aligned</span>(<span class="ident">new_size</span>, <span class="ident">PAGE_SIZE</span>)<span class="question-mark">?</span>;
+        <span class="comment">// 1. get the previous mapping&#39;s address and size.</span>
+        <span class="kw">let</span> <span class="ident">old_mapping_ref</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">userspace_bookkeping</span>.<span class="ident">occupied_mapping_at</span>(<span class="ident">address</span>)<span class="question-mark">?</span>;
+        <span class="kw">let</span> (<span class="ident">start_addr</span>, <span class="ident">old_size</span>) <span class="op">=</span> {
+            <span class="comment">// Check we&#39;re resizing the heap.</span>
+            <span class="kw">if</span> <span class="ident">old_mapping_ref</span>.<span class="ident">state</span>().<span class="ident">ty</span>() <span class="op">!</span><span class="op">=</span> <span class="ident">MemoryType</span>::<span class="ident">Heap</span> {
+                <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">KernelError</span>::<span class="ident">InvalidMemState</span> { <span class="ident">address</span>: <span class="ident">address</span>, <span class="ident">ty</span>: <span class="ident">old_mapping_ref</span>.<span class="ident">state</span>().<span class="ident">ty</span>(), <span class="ident">backtrace</span>: <span class="ident">Backtrace</span>::<span class="ident">new</span>() });
+            }
+            <span class="comment">// check it&#39;s not a system reserved or regular mapping.</span>
+            <span class="kw">if</span> <span class="kw">let</span> <span class="ident">MappingFrames</span>::<span class="ident">Owned</span>(..) <span class="op">|</span> <span class="ident">MappingFrames</span>::<span class="prelude-val">None</span> <span class="op">=</span> <span class="ident">old_mapping_ref</span>.<span class="ident">frames</span>() {
+                <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">KernelError</span>::<span class="ident">InvalidAddress</span> { <span class="ident">address</span>: <span class="ident">address</span>.<span class="ident">addr</span>(), <span class="ident">backtrace</span>: <span class="ident">Backtrace</span>::<span class="ident">new</span>() });
+            }
+            (<span class="ident">old_mapping_ref</span>.<span class="ident">address</span>(), <span class="ident">old_mapping_ref</span>.<span class="ident">length</span>())
+        };
+
+        <span class="comment">// 2. Check the area we&#39;re extending to is available.</span>
+        <span class="ident">UserLand</span>::<span class="ident">check_contains_region</span>(<span class="ident">start_addr</span>, <span class="ident">new_size</span>)<span class="question-mark">?</span>;
+        <span class="kw">if</span> <span class="ident">new_size</span> <span class="op">&lt;</span> <span class="ident">old_size</span> {
+            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">KernelError</span>::<span class="ident">InvalidSize</span> { <span class="ident">size</span>: <span class="ident">new_size</span>, <span class="ident">backtrace</span>: <span class="ident">Backtrace</span>::<span class="ident">new</span>() });
+        }
+        <span class="kw">if</span> <span class="ident">new_size</span> <span class="op">=</span><span class="op">=</span> <span class="ident">old_size</span> {
+            <span class="kw">return</span> <span class="prelude-val">Ok</span>(()) <span class="comment">// don&#39;t do anything.</span>
+        }
+        <span class="kw">let</span> <span class="ident">added_length</span> <span class="op">=</span> <span class="ident">new_size</span> <span class="op">-</span> <span class="ident">old_size</span>;
+        <span class="self">self</span>.<span class="ident">userspace_bookkeping</span>.<span class="ident">check_vacant</span>(<span class="ident">start_addr</span> <span class="op">+</span> <span class="ident">old_size</span>, <span class="ident">added_length</span>)<span class="question-mark">?</span>;
+
+        <span class="comment">// 3. allocate the new frames.</span>
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">new_frames</span> <span class="op">=</span> <span class="ident">FrameAllocator</span>::<span class="ident">allocate_frames_fragmented</span>(<span class="ident">added_length</span>)<span class="question-mark">?</span>;
+
+        <span class="comment">// 4. remove old mapping from the bookkeeping.</span>
+        <span class="kw">let</span> <span class="ident">old_mapping</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">userspace_bookkeping</span>.<span class="ident">remove_mapping</span>(<span class="ident">start_addr</span>, <span class="ident">old_size</span>)
+            .<span class="ident">expect</span>(<span class="string">&quot;expand_mapping: removing the mapping failed.&quot;</span>);
+        <span class="kw">let</span> <span class="ident">flags</span> <span class="op">=</span> <span class="ident">old_mapping</span>.<span class="ident">flags</span>();
+
+        <span class="comment">// 5. construct a new bigger mapping, with the same type and flags.</span>
+        <span class="kw">let</span> <span class="ident">new_mapping</span> <span class="op">=</span> <span class="kw">if</span> <span class="kw">let</span> <span class="ident">MappingFrames</span>::<span class="ident">Shared</span>(<span class="ident">frames</span>) <span class="op">=</span> <span class="ident">old_mapping</span>.<span class="ident">frames</span>() {
+            <span class="comment">// 6. map the added part accordingly.</span>
+            <span class="self">self</span>.<span class="ident">get_hierarchy</span>().<span class="ident">map_to_from_iterator</span>(<span class="ident">new_frames</span>.<span class="ident">iter</span>().<span class="ident">flatten</span>(), <span class="ident">start_addr</span> <span class="op">+</span> <span class="ident">old_size</span>, <span class="ident">flags</span>);
+            <span class="comment">// create a mapping from the freshly allocated frames and the flags.</span>
+            <span class="ident">frames</span>.<span class="ident">write</span>().<span class="ident">append</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">new_frames</span>);
+            <span class="ident">Mapping</span>::<span class="ident">new</span>(<span class="ident">start_addr</span>, <span class="ident">MappingFrames</span>::<span class="ident">Shared</span>(<span class="ident">frames</span>.<span class="ident">clone</span>()), <span class="number">0</span>, <span class="ident">new_size</span>, <span class="ident">MemoryType</span>::<span class="ident">Heap</span>, <span class="ident">flags</span>)
+                .<span class="ident">expect</span>(<span class="string">&quot;expand_mapping: couldn&#39;t recreate mapping&quot;</span>)
+        } <span class="kw">else</span> {
+            <span class="macro">unreachable</span><span class="macro">!</span>(<span class="string">&quot;We checked we could only get a MappingFrames earlier.&quot;</span>);
+        };
+        <span class="self">self</span>.<span class="ident">userspace_bookkeping</span>.<span class="ident">add_mapping</span>(<span class="ident">new_mapping</span>)
+            .<span class="ident">expect</span>(<span class="string">&quot;expand_mapping: failed re-adding the mapping to the bookkeeping&quot;</span>);
+        <span class="prelude-val">Ok</span>(())
+    }
+
+    <span class="doccomment">/// Finds a hole in virtual space at least `length` long.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// # Error</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// Returns a KernelError if no sufficiently big hole was found.</span>
+    <span class="doccomment">/// Returns a KernelError if `length` is 0.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">find_available_space</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">length</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">VirtualAddress</span>, <span class="ident">KernelError</span><span class="op">&gt;</span> {
+        <span class="self">self</span>.<span class="ident">userspace_bookkeping</span>.<span class="ident">find_available_space</span>(<span class="ident">length</span>)
+    }
+
+    <span class="doccomment">/// Retrieves the mapping that `address` falls into, and mirror it in KernelLand.</span>
+    <span class="doccomment">/// The mapping will be kept alive until the `CrossProcessMapping` is dropped.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// # Error</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// Returns an Error if the mapping is not RefCounted.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">mirror_mapping</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">address</span>: <span class="ident">VirtualAddress</span>, <span class="ident">length</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">CrossProcessMapping</span>, <span class="ident">KernelError</span><span class="op">&gt;</span> {
+        <span class="ident">UserLand</span>::<span class="ident">check_contains_address</span>(<span class="ident">address</span>)<span class="question-mark">?</span>;
+        <span class="kw">let</span> <span class="ident">mapping</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">userspace_bookkeping</span>.<span class="ident">occupied_mapping_at</span>(<span class="ident">address</span>)<span class="question-mark">?</span>;
+        <span class="kw">let</span> <span class="ident">offset</span> <span class="op">=</span> <span class="ident">address</span> <span class="op">-</span> <span class="ident">mapping</span>.<span class="ident">address</span>();
+        <span class="ident">CrossProcessMapping</span>::<span class="ident">mirror_mapping</span>(<span class="ident">mapping</span>, <span class="ident">offset</span>, <span class="ident">length</span>)
+    }
+
+    <span class="doccomment">/// Resize the heap of this process, just like a brk.</span>
+    <span class="doccomment">/// It can both expand or shrink the heap.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// If `new_size` == 0, it is completely de-allocated.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// # Return</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// The address of the start of the heap.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// # Error</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// * InvalidSize if `new_size` is not [PAGE_SIZE] aligned.</span>
+    <span class="doccomment">/// * InvalidSize if \[`address`..`new_size`\] does not fall in UserLand,</span>
+    <span class="doccomment">///   or overlaps an existing mapping.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">resize_heap</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">new_size</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">VirtualAddress</span>, <span class="ident">KernelError</span><span class="op">&gt;</span> {
+        <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">clippy</span>::<span class="ident">missing_docs_in_private_items</span>)]</span>
+        <span class="kw">enum</span> <span class="ident">HeapState</span> { <span class="ident">NoHeap</span>, <span class="ident">Heap</span>(<span class="ident">usize</span>) };
+        <span class="ident">UserLand</span>::<span class="ident">check_contains_region</span>(<span class="self">self</span>.<span class="ident">heap_base_address</span>, <span class="ident">new_size</span>)<span class="question-mark">?</span>;
+        <span class="comment">// get the previous heap size</span>
+        <span class="kw">let</span> <span class="ident">previous_heap_state</span> <span class="op">=</span> {
+            <span class="kw">let</span> <span class="ident">query</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">userspace_bookkeping</span>.<span class="ident">mapping_at</span>(<span class="self">self</span>.<span class="ident">heap_base_address</span>);
+            <span class="kw">let</span> <span class="ident">heap</span> <span class="op">=</span> <span class="ident">query</span>.<span class="ident">mapping</span>();
+            <span class="kw">if</span> <span class="kw">let</span> <span class="ident">MemoryType</span>::<span class="ident">Unmapped</span> <span class="op">=</span> <span class="ident">heap</span>.<span class="ident">state</span>().<span class="ident">ty</span>() {
+                <span class="ident">HeapState</span>::<span class="ident">NoHeap</span>
+            } <span class="kw">else</span> {
+                <span class="ident">HeapState</span>::<span class="ident">Heap</span>(<span class="ident">heap</span>.<span class="ident">length</span>())
+            }
+        };
+        <span class="kw">let</span> <span class="ident">heap_base_address</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">heap_base_address</span>;
+        <span class="kw">match</span> <span class="ident">previous_heap_state</span> {
+            <span class="ident">HeapState</span>::<span class="ident">NoHeap</span> <span class="kw">if</span> <span class="ident">new_size</span> <span class="op">=</span><span class="op">=</span> <span class="number">0</span> <span class="op">=</span><span class="op">&gt;</span> (), <span class="comment">// don&#39;t do anything</span>
+            <span class="ident">HeapState</span>::<span class="ident">NoHeap</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">create_regular_mapping</span>(<span class="ident">heap_base_address</span>, <span class="ident">new_size</span>, <span class="ident">MemoryType</span>::<span class="ident">Heap</span>, <span class="ident">MappingAccessRights</span>::<span class="ident">u_rw</span>())<span class="question-mark">?</span>,
+            <span class="comment">// TODO: Shrink mapping</span>
+            <span class="ident">HeapState</span>::<span class="ident">Heap</span>(<span class="ident">old_size</span>) <span class="kw">if</span> <span class="ident">new_size</span> <span class="op">&lt;</span> <span class="ident">old_size</span> <span class="op">=</span><span class="op">&gt;</span> (),
+            <span class="comment">//HeapState::Heap(old_size) if new_size &lt; old_size =&gt; { self.shrink_mapping(heap_base_address, new_size)?; },</span>
+            <span class="ident">HeapState</span>::<span class="ident">Heap</span>(<span class="kw">_</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">expand_mapping</span>(<span class="ident">heap_base_address</span>, <span class="ident">new_size</span>)<span class="question-mark">?</span>
+        }
+        <span class="prelude-val">Ok</span>(<span class="self">self</span>.<span class="ident">heap_base_address</span>)
+    }
+
+    <span class="doccomment">/// Switches to this process memory</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">switch_to</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) {
+        <span class="self">self</span>.<span class="ident">table_hierarchy</span>.<span class="ident">switch_to</span>();
+    }
+
+    <span class="doccomment">/// Checks that the given memory range is homogenous (that is, all blocks</span>
+    <span class="doccomment">/// within the range have the same permissions and state), and that it has</span>
+    <span class="doccomment">/// an expected set of state, permissions and attributes.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// # Errors</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// - `InvalidMemState`</span>
+    <span class="doccomment">///   - The state of a subsection of the memory region is not in the</span>
+    <span class="doccomment">///     expected state.</span>
+    <span class="doccomment">///   - The perms of a subsection of the memory region is not in the</span>
+    <span class="doccomment">///     expected state.</span>
+    <span class="doccomment">///   - The attrs of a subsection of the memory region is not in the</span>
+    <span class="doccomment">///     expected state.</span>
+    <span class="doccomment">///   - The range does not have homogenous state or perms. All mappings in</span>
+    <span class="doccomment">///     a region should have the same perms and state.</span>
+    <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">clippy</span>::<span class="ident">too_many_arguments</span>)]</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">check_range</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">addr</span>: <span class="ident">VirtualAddress</span>, <span class="ident">size</span>: <span class="ident">usize</span>,
+        <span class="ident">state_mask</span>: <span class="ident">MemoryState</span>, <span class="ident">state_expected</span>: <span class="ident">MemoryState</span>,
+        <span class="ident">perms_mask</span>: <span class="ident">MemoryPermissions</span>, <span class="ident">perms_expected</span>: <span class="ident">MemoryPermissions</span>,
+        <span class="ident">_attrs_mask</span>: <span class="ident">MemoryAttributes</span>, <span class="ident">_attrs_expected</span>: <span class="ident">MemoryAttributes</span>,
+        <span class="ident">_attrs_ignore_mask</span>: <span class="ident">MemoryAttributes</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(<span class="ident">MemoryState</span>, <span class="ident">MemoryPermissions</span>, <span class="ident">MemoryAttributes</span>), <span class="ident">KernelError</span><span class="op">&gt;</span>
+    {
+        <span class="kw">let</span> <span class="ident">addr_end</span> <span class="op">=</span> <span class="ident">addr</span> <span class="op">+</span> <span class="ident">size</span>;
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">cur_addr</span> <span class="op">=</span> <span class="ident">addr</span>;
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">first_block_state</span> <span class="op">=</span> <span class="prelude-val">None</span>;
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">first_block_perms</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">MemoryPermissions</span><span class="op">&gt;</span> <span class="op">=</span> <span class="prelude-val">None</span>;
+        <span class="kw">loop</span> {
+            <span class="kw">let</span> <span class="ident">mem</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">query_memory</span>(<span class="ident">cur_addr</span>);
+            <span class="kw">let</span> <span class="ident">mapping_perms</span> <span class="op">=</span> <span class="ident">mem</span>.<span class="ident">mapping</span>().<span class="ident">flags</span>().<span class="ident">into</span>();
+
+            <span class="comment">// First check for coherence: Blocks after the first must have the</span>
+            <span class="comment">// same state and permissions.</span>
+            <span class="kw">if</span> <span class="kw-2">*</span><span class="ident">first_block_state</span>.<span class="ident">get_or_insert</span>(<span class="ident">mem</span>.<span class="ident">mapping</span>().<span class="ident">state</span>()) <span class="op">!</span><span class="op">=</span> <span class="ident">mem</span>.<span class="ident">mapping</span>().<span class="ident">state</span>() {
+                <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">KernelError</span>::<span class="ident">InvalidMemState</span> {
+                    <span class="ident">address</span>: <span class="ident">cur_addr</span>,
+                    <span class="ident">ty</span>: <span class="ident">mem</span>.<span class="ident">mapping</span>().<span class="ident">state</span>().<span class="ident">ty</span>(),
+                    <span class="ident">backtrace</span>: <span class="ident">Backtrace</span>::<span class="ident">new</span>()
+                })
+            }
+            <span class="kw">if</span> <span class="kw-2">*</span><span class="ident">first_block_perms</span>.<span class="ident">get_or_insert</span>(<span class="ident">mapping_perms</span>) <span class="op">!</span><span class="op">=</span> <span class="ident">mapping_perms</span> {
+                <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">KernelError</span>::<span class="ident">InvalidMemState</span> {
+                    <span class="ident">address</span>: <span class="ident">cur_addr</span>,
+                    <span class="ident">ty</span>: <span class="ident">mem</span>.<span class="ident">mapping</span>().<span class="ident">state</span>().<span class="ident">ty</span>(),
+                    <span class="ident">backtrace</span>: <span class="ident">Backtrace</span>::<span class="ident">new</span>()
+                })
+            }
+
+            <span class="comment">// If the blocks are coherent, (or if this is the first block) we</span>
+            <span class="comment">// should check that the state, permissions and attributes are all</span>
+            <span class="comment">// in the expected state.</span>
+            <span class="kw">if</span> <span class="ident">mem</span>.<span class="ident">mapping</span>().<span class="ident">state</span>() <span class="op">&amp;</span> <span class="ident">state_mask</span> <span class="op">!</span><span class="op">=</span> <span class="ident">state_expected</span> <span class="op">|</span><span class="op">|</span>
+                <span class="comment">// mem.mapping().attributes() &amp; attrs_mask != attrs_expected ||</span>
+                <span class="ident">mapping_perms</span> <span class="op">&amp;</span> <span class="ident">perms_mask</span> <span class="op">!</span><span class="op">=</span> <span class="ident">perms_expected</span>
+            {
+                <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">KernelError</span>::<span class="ident">InvalidMemState</span> {
+                    <span class="ident">address</span>: <span class="ident">cur_addr</span>,
+                    <span class="ident">ty</span>: <span class="ident">mem</span>.<span class="ident">mapping</span>().<span class="ident">state</span>().<span class="ident">ty</span>(),
+                    <span class="ident">backtrace</span>: <span class="ident">Backtrace</span>::<span class="ident">new</span>()
+                });
+            }
+
+            <span class="ident">cur_addr</span> <span class="op">=</span> <span class="ident">mem</span>.<span class="ident">mapping</span>().<span class="ident">address</span>() <span class="op">+</span> <span class="ident">mem</span>.<span class="ident">mapping</span>().<span class="ident">length</span>();
+            <span class="kw">if</span> <span class="ident">cur_addr</span> <span class="op">&gt;</span><span class="op">=</span> <span class="ident">addr_end</span> {
+                <span class="kw">return</span> <span class="prelude-val">Ok</span>((<span class="ident">mem</span>.<span class="ident">mapping</span>().<span class="ident">state</span>(), <span class="ident">mem</span>.<span class="ident">mapping</span>().<span class="ident">flags</span>().<span class="ident">into</span>(), <span class="ident">MemoryAttributes</span>::<span class="ident">empty</span>()))
+            }
+        }
+    }
+}
+
+</pre></div>
+</section><section id="search" class="content hidden"></section><section class="footer"></section><script>window.rootPath = "../../../";window.currentCrate = "sunrise_kernel";</script><script src="../../../main.js"></script><script src="../../../source-script.js"></script><script src="../../../source-files.js"></script><script defer src="../../../search-index.js"></script></body></html>

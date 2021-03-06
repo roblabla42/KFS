@@ -1,0 +1,1 @@
+initSidebarItems({"trait":[["I386PageTablesSet","A trait describing the interface of a PageTable hierarchy."]]});

@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["InnerKeyboard","Inner state of a managed keyboard."],["Keyboard","A managed keyboard."]]});

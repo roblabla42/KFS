@@ -1,0 +1,1 @@
+initSidebarItems({"enum":[["FisType","The types of a FIS."]],"struct":[["FisData","Data FIS - bidirectional"],["FisDmaSetup","DMA setup FIS - bidirectional"],["FisPioSetup","PIO setup FIS - device to host"],["FisRegD2H","Register FIS - device to host"],["FisRegH2D","Register FIS - host to device"],["FisSetDeviceBits","Set device bits FIS - device to host"]]});

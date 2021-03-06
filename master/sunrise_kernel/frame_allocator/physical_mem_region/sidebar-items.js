@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["PhysicalMemRegion","A span of adjacent physical frames. A frame is [PAGE_SIZE]."],["PhysicalMemRegionIter","An iterator over a physical region. Yields the address of each contained frame."]]});

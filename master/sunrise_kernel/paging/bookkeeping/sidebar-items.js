@@ -1,0 +1,1 @@
+initSidebarItems({"enum":[["QueryMemory","Because we do not store Available mappings internally, we need this enum to return a new available mappings, or a reference to the stored mapping."]],"struct":[["UserspaceBookkeeping","A bookkeeping is just a list of Mappings"]]});

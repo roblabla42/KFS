@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["compare_cstr","Compare two C strings."],["len_cstr","Compute the length of a C string."]]});

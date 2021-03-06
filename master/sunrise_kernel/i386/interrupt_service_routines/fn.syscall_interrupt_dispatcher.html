@@ -1,0 +1,32 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="API documentation for the Rust `syscall_interrupt_dispatcher` fn in crate `sunrise_kernel`."><meta name="keywords" content="rust, rustlang, rust-lang, syscall_interrupt_dispatcher"><title>sunrise_kernel::i386::interrupt_service_routines::syscall_interrupt_dispatcher - Rust</title><link rel="stylesheet" type="text/css" href="../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../dark.css"><link rel="stylesheet" type="text/css" href="../../../light.css" id="themeStyle"><script src="../../../storage.js"></script><noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="shortcut icon" href="../../../favicon.ico"><style type="text/css">#crate-search{background-image:url("../../../down-arrow.svg");}</style></head><body class="rustdoc fn"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu">&#9776;</div><a href='../../../sunrise_kernel/index.html'><div class='logo-container'><img src='../../../rust-logo.png' alt='logo'></div></a><div class="sidebar-elems"><p class='location'><a href='../../index.html'>sunrise_kernel</a>::<wbr><a href='../index.html'>i386</a>::<wbr><a href='index.html'>interrupt_service_routines</a></p><script>window.sidebarCurrent = {name: 'syscall_interrupt_dispatcher', ty: 'fn', relpath: ''};</script><script defer src="sidebar-items.js"></script></div></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!"><img src="../../../brush.svg" width="18" alt="Pick another theme!"></button><div id="theme-choices"></div></div><script src="../../../theme.js"></script><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><a id="settings-menu" href="../../../settings.html"><img src="../../../wheel.svg" width="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><h1 class='fqn'><span class='out-of-band'><span id='render-detail'><a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class='inner'>&#x2212;</span>]</a></span><a class='srclink' href='../../../src/sunrise_kernel/i386/interrupt_service_routines.rs.html#934-1013' title='goto source code'>[src]</a></span><span class='in-band'>Function <a href='../../index.html'>sunrise_kernel</a>::<wbr><a href='../index.html'>i386</a>::<wbr><a href='index.html'>interrupt_service_routines</a>::<wbr><a class="fn" href=''>syscall_interrupt_dispatcher</a></span></h1><pre class='rust fn'>fn syscall_interrupt_dispatcher(<br>&nbsp;&nbsp;&nbsp;&nbsp;_exception_name: &amp;'static <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.str.html">str</a>, <br>&nbsp;&nbsp;&nbsp;&nbsp;hwcontext: &amp;mut <a class="struct" href="../../../sunrise_kernel/i386/interrupt_service_routines/struct.UserspaceHardwareContext.html" title="struct sunrise_kernel::i386::interrupt_service_routines::UserspaceHardwareContext">UserspaceHardwareContext</a>, <br>&nbsp;&nbsp;&nbsp;&nbsp;_has_errcode: <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.bool.html">bool</a><br>)</pre><div class='docblock'><p>This is the function called on int 0x80.</p>
+<p>The ABI is linuxy, but modified to allow multiple register returns:</p>
+<h1 id="inputs" class="section-header"><a href="#inputs">Inputs</a></h1>
+<ul>
+<li>eax  system call number</li>
+<li>ebx  arg1</li>
+<li>ecx  arg2</li>
+<li>edx  arg3</li>
+<li>esi  arg4</li>
+<li>edi  arg5</li>
+<li>ebp  arg6</li>
+</ul>
+<h1 id="outputs" class="section-header"><a href="#outputs">Outputs</a></h1>
+<ul>
+<li>eax  error code</li>
+<li>ebx  ret1</li>
+<li>ecx  ret2</li>
+<li>edx  ret3</li>
+<li>esi  ret4</li>
+<li>edi  ret5</li>
+<li>ebp  ret6</li>
+</ul>
+<p>What this wrapper does is creating an instance of the Registers structure on the stack as argument
+to the syscall dispatcher. The syscall dispatcher will then modify this structure to reflect what
+the registers should look like on syscall exit, and the wrapper pops those modified values.</p>
+<p>We don't use the x86-interrupt llvm feature because syscall arguments are passed in registers, and
+it does not enable us to access those saved registers.</p>
+<p>We do <em>NOT</em> restore registers before returning, as they all are used for parameter passing.
+It is the caller's job to save the one it needs.</p>
+<p>Dispatches to the various syscall handling functions based on <code>hwcontext.eax</code>,
+and updates the hwcontext with the correct return values.</p>
+</div></section><section id="search" class="content hidden"></section><section class="footer"></section><script>window.rootPath = "../../../";window.currentCrate = "sunrise_kernel";</script><script src="../../../main.js"></script><script defer src="../../../search-index.js"></script></body></html>

@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["TLSManager","TLS allocator"],["TLSPage","Manages a page containing 8 TLS"]]});

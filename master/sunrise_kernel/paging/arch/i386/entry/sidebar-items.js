@@ -1,0 +1,1 @@
+initSidebarItems({"constant":[["ENTRY_PHYS_ADDRESS_MASK","The part of an entry that encodes the physical address."]],"struct":[["I386Entry","An entry in a page table or page directory. An unused entry is 0."],["I386EntryFlags","The flags of a table entry"]]});

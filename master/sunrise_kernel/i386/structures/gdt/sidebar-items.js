@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["SegmentSelector","Specifies which element to load into a segment from descriptor tables (i.e., is a index to LDT or GDT table with some additional flags)."]]});

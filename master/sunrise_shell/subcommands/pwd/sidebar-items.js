@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["main","Print the current working directory."]],"static":[["HELP","Help string."]]});

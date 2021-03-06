@@ -1,0 +1,235 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="API documentation for the Rust `server` mod in crate `sunrise_libuser`."><meta name="keywords" content="rust, rustlang, rust-lang, server"><title>sunrise_libuser::ipc::server - Rust</title><link rel="stylesheet" type="text/css" href="../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../dark.css"><link rel="stylesheet" type="text/css" href="../../../light.css" id="themeStyle"><script src="../../../storage.js"></script><noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="shortcut icon" href="../../../favicon.ico"><style type="text/css">#crate-search{background-image:url("../../../down-arrow.svg");}</style></head><body class="rustdoc mod"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu">&#9776;</div><a href='../../../sunrise_libuser/index.html'><div class='logo-container'><img src='../../../rust-logo.png' alt='logo'></div></a><p class='location'>Module server</p><div class="sidebar-elems"><div class="block items"><ul><li><a href="#modules">Modules</a></li><li><a href="#structs">Structs</a></li><li><a href="#functions">Functions</a></li></ul></div><p class='location'><a href='../../index.html'>sunrise_libuser</a>::<wbr><a href='../index.html'>ipc</a></p><script>window.sidebarCurrent = {name: 'server', ty: 'mod', relpath: '../'};</script><script defer src="../sidebar-items.js"></script></div></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!"><img src="../../../brush.svg" width="18" alt="Pick another theme!"></button><div id="theme-choices"></div></div><script src="../../../theme.js"></script><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><a id="settings-menu" href="../../../settings.html"><img src="../../../wheel.svg" width="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><h1 class='fqn'><span class='out-of-band'><span id='render-detail'><a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class='inner'>&#x2212;</span>]</a></span><a class='srclink' href='../../../src/sunrise_libuser/ipc/server.rs.html#1-495' title='goto source code'>[src]</a></span><span class='in-band'>Module <a href='../../index.html'>sunrise_libuser</a>::<wbr><a href='../index.html'>ipc</a>::<wbr><a class="mod" href=''>server</a></span></h1><div class='docblock'><h1 id="ipc-server-primitives" class="section-header"><a href="#ipc-server-primitives">IPC Server primitives</a></h1>
+<p>The IPC System on horizon is made of Ports pair and Session pairs. Each pair
+has a client and a server side:</p>
+<ul>
+<li>For Ports, the client is used to connect, returning a client Session,
+while the server is used to accept connections, returning a server Session</li>
+<li>For Sessions, the client is used to send IPC requests, while the server
+is used to receive and reply to those requests.</li>
+</ul>
+<p>An IPC Server is made of a <a href="../../../sunrise_libuser/futures/index.html">future executor</a> on which we
+spawn futures to handle Port and Session. Those futures, created through
+[fn port_handler] and [fn new_session_wrapper], will take care of accepting
+new sessions from a ServerPort, and answering IPC requests sent on the
+ServerSession.</p>
+<h2 id="port-handling" class="section-header"><a href="#port-handling">Port Handling</a></h2>
+<p>Most interfaces start with a Port, which is basically an object to which
+clients can connect to, creating a Session pair. Ports can come from two
+places: It can either be kernel-managed, or it can be sm-managed. Almost
+all ports are sm-managed, the only exceptions being <code>sm:</code> itself.</p>
+<p>Kernel-managed ports are created through the [fn managed_port_handler]
+function. This will internally call <a href="../../../sunrise_libuser/syscalls/fn.manage_named_port.html" title="crate::syscalls::manage_named_port()">crate::syscalls::manage_named_port()</a>
+to acquire a <a href="../../../sunrise_libuser/types/struct.ServerPort.html" title="crate::types::ServerPort">crate::types::ServerPort</a>. Sm-managed ports are created
+through [fn port_handler], which call
+<a href="../../../sunrise_libuser/sm/struct.IUserInterfaceProxy.html#method.register_service" title="crate::sm::IUserInterfaceProxy::register_service()">crate::sm::IUserInterfaceProxy::register_service()</a> to acquire their
+ServerPort.</p>
+<p>Once the ServerPort is acquired, the port handling functions will run on a
+loop, accepting new connections, creating a backing Object for the sessions,
+and spawning a new future on the event loop with [fn new_session_wrapper].</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered">
+<span class="kw">use</span> <span class="ident">alloc</span>::<span class="ident">boxed</span>::<span class="ident">Box</span>;
+<span class="kw">use</span> <span class="ident">sunrise_libuser</span>::<span class="ident">futures</span>::<span class="ident">WaitableManager</span>;
+<span class="kw">use</span> <span class="ident">sunrise_libuser</span>::<span class="ident">futures_rs</span>::<span class="ident">future</span>::<span class="ident">FutureObj</span>;
+<span class="kw">use</span> <span class="ident">sunrise_libuser</span>::<span class="ident">ipc</span>::<span class="ident">server</span>::<span class="ident">port_handler</span>;
+<span class="kw">use</span> <span class="ident">sunrise_libuser</span>::<span class="ident">example</span>::<span class="ident">IExample1</span>;
+
+<span class="doccomment">/// Every time the port accepts a connection and a session is created, it</span>
+<span class="doccomment">/// will spawn a HelloInterface.</span>
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Default</span>, <span class="ident">Clone</span>)]</span>
+<span class="kw">struct</span> <span class="ident">HelloInterface</span>;
+
+<span class="kw">impl</span> <span class="ident">IExample1</span> <span class="kw">for</span> <span class="ident">HelloInterface</span> {}
+
+<span class="kw">fn</span> <span class="ident">main</span>() {
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">man</span> <span class="op">=</span> <span class="ident">WaitableManager</span>::<span class="ident">new</span>();
+
+    <span class="kw">let</span> <span class="ident">handler</span> <span class="op">=</span> <span class="ident">port_handler</span>(<span class="ident">man</span>.<span class="ident">work_queue</span>(), <span class="string">&quot;hello&quot;</span>, <span class="ident">HelloInterface</span>::<span class="ident">dispatch</span>).<span class="ident">unwrap</span>();
+    <span class="ident">man</span>.<span class="ident">work_queue</span>().<span class="ident">spawn</span>(<span class="ident">FutureObj</span>::<span class="ident">new</span>(<span class="ident">Box</span>::<span class="ident">new</span>(<span class="ident">handler</span>)));
+
+    <span class="ident">man</span>.<span class="ident">run</span>();
+}</pre></div>
+<h2 id="session-handling" class="section-header"><a href="#session-handling">Session Handling</a></h2>
+<p>A Session server is represented by an Object implementing an Interface,
+receiving and replying to Remote Process Call (RPC) requests on a
+<a href="../../../sunrise_libuser/types/struct.ServerSession.html" title="crate::types::ServerSession">crate::types::ServerSession</a>. A session server is created either through a
+port handler accepting a session, or through the [fn new_session_wrapper]
+function, which will receive requests, call the Object's dispatcher
+function, and reply with the answer.</p>
+<h3 id="interfaces" class="section-header"><a href="#interfaces">Interfaces</a></h3>
+<p>IPC Servers expose an API to a given service to other processes using an RPC
+interface. The interface is defined using a SwIPC id file which can be found
+in the <code>ipcdefs</code> folder at the root of the repository. This SwIPC file will
+then get compiled by swipc-gen into a rust file containing a Client struct
+and two Server traits (one being synchronous, the other asynchronous). Those
+will generally be exposed from the <code>sunrise_libuser</code> crate.</p>
+<p>Those traits contain two elements:</p>
+<ol>
+<li>
+<p>A function for every function in the SwIPC interface, having roughly the
+same signature (but with SwIPC types translated to rust). The user is
+expected to implement all those functions to have a complete interface
+implementation.</p>
+</li>
+<li>
+<p>A function called <code>dispatch</code>. This function will be called by the Session
+Wrapper, and is in charge of parsing the IPC message data to extract all
+the arguments and call the correct function from the trait
+implementation.</p>
+</li>
+</ol>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered">
+<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">alloc</span>;
+
+<span class="kw">use</span> <span class="ident">alloc</span>::<span class="ident">boxed</span>::<span class="ident">Box</span>;
+<span class="kw">use</span> <span class="ident">sunrise_libuser</span>::<span class="ident">futures</span>::{<span class="ident">WorkQueue</span>, <span class="ident">WaitableManager</span>};
+<span class="kw">use</span> <span class="ident">sunrise_libuser</span>::<span class="ident">futures_rs</span>::<span class="ident">future</span>::<span class="ident">FutureObj</span>;
+<span class="kw">use</span> <span class="ident">sunrise_libuser</span>::<span class="ident">ipc</span>::<span class="ident">server</span>::<span class="ident">port_handler</span>;
+<span class="kw">use</span> <span class="ident">sunrise_libuser</span>::<span class="ident">example</span>::<span class="ident">IExample2</span>;
+<span class="kw">use</span> <span class="ident">sunrise_libuser</span>::<span class="ident">error</span>::<span class="ident">Error</span>;
+<span class="kw">use</span> <span class="ident">log</span>::<span class="kw-2">*</span>;
+
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Default</span>, <span class="ident">Clone</span>)]</span>
+<span class="kw">struct</span> <span class="ident">HelloInterface</span>;
+
+<span class="kw">impl</span> <span class="ident">IExample2</span> <span class="kw">for</span> <span class="ident">HelloInterface</span> {
+    <span class="kw">fn</span> <span class="ident">function</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">_manager</span>: <span class="ident">WorkQueue</span><span class="op">&lt;</span><span class="lifetime">&#39;static</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident">Error</span><span class="op">&gt;</span> {
+        <span class="macro">info</span><span class="macro">!</span>(<span class="string">&quot;hello&quot;</span>);
+        <span class="prelude-val">Ok</span>(())
+    }
+    <span class="kw">fn</span> <span class="ident">function2</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">_manager</span>: <span class="ident">WorkQueue</span><span class="op">&lt;</span><span class="lifetime">&#39;static</span><span class="op">&gt;</span>, <span class="ident">val1</span>: <span class="ident">u32</span>, <span class="ident">val2</span>: <span class="ident">u32</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(<span class="ident">bool</span>, <span class="ident">bool</span>), <span class="ident">Error</span><span class="op">&gt;</span> {
+        <span class="macro">info</span><span class="macro">!</span>(<span class="string">&quot;hello&quot;</span>);
+        <span class="prelude-val">Ok</span>((<span class="bool-val">false</span>, <span class="bool-val">true</span>))
+    }
+}
+
+<span class="kw">fn</span> <span class="ident">main</span>() {
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">man</span> <span class="op">=</span> <span class="ident">WaitableManager</span>::<span class="ident">new</span>();
+
+    <span class="kw">let</span> <span class="ident">handler</span> <span class="op">=</span> <span class="ident">port_handler</span>(<span class="ident">man</span>.<span class="ident">work_queue</span>(), <span class="string">&quot;hello&quot;</span>, <span class="ident">HelloInterface</span>::<span class="ident">dispatch</span>).<span class="ident">unwrap</span>();
+    <span class="ident">man</span>.<span class="ident">work_queue</span>().<span class="ident">spawn</span>(<span class="ident">FutureObj</span>::<span class="ident">new</span>(<span class="ident">Box</span>::<span class="ident">new</span>(<span class="ident">handler</span>)));
+
+
+    <span class="ident">man</span>.<span class="ident">run</span>();
+}</pre></div>
+<h3 id="objects" class="section-header"><a href="#objects">Objects</a></h3>
+<p>An Object backs every Session. This object is the structure which implements
+the Interface trait. It contains the state of that specific session, and may
+be mutated by any IPC request. A common pattern is to have an IPC request
+contain an initialization method containing various parameters to configure
+the rest of the operations available on that session.</p>
+<p>Note that a single interface may be implemented by multiple different
+Object. This can be used to implement different access control based on the
+interface used to access the service, for instance. Nintendo uses this
+pattern: <code>bsd:u</code> and <code>bsd:s</code> use the same interface, but have different
+access rights.</p>
+<h3 id="subsessions" class="section-header"><a href="#subsessions">Subsessions</a></h3>
+<p>While the &quot;root&quot; session is generally created from a Port Handler, the user
+is free to create and return new subsessions. This can be done by creating
+a session pair with <a href="../../../sunrise_libuser/syscalls/fn.create_session.html" title="crate::syscalls::create_session()">crate::syscalls::create_session()</a>, spawning a new
+Session Handler with [fn new_session_wrapper], and returning the client-side
+session handle. Here's an example:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered">
+<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">alloc</span>;
+<span class="kw">use</span> <span class="ident">alloc</span>::<span class="ident">boxed</span>::<span class="ident">Box</span>;
+<span class="kw">use</span> <span class="ident">sunrise_libuser</span>::<span class="ident">futures</span>::<span class="ident">WorkQueue</span>;
+<span class="kw">use</span> <span class="ident">sunrise_libuser</span>::<span class="ident">futures_rs</span>::<span class="ident">future</span>::<span class="ident">FutureObj</span>;
+<span class="kw">use</span> <span class="ident">sunrise_libuser</span>::<span class="ident">example</span>::{<span class="ident">IExample3</span>, <span class="ident">IExample3Subsession</span>, <span class="ident">IExample3SubsessionProxy</span>};
+<span class="kw">use</span> <span class="ident">sunrise_libuser</span>::<span class="ident">syscalls</span>;
+<span class="kw">use</span> <span class="ident">sunrise_libuser</span>::<span class="ident">error</span>::<span class="ident">Error</span>;
+<span class="kw">use</span> <span class="ident">sunrise_libuser</span>::<span class="ident">ipc</span>::<span class="ident">server</span>::<span class="ident">new_session_wrapper</span>;
+
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Default</span>, <span class="ident">Clone</span>)]</span>
+<span class="kw">struct</span> <span class="ident">HelloInterface</span>;
+
+<span class="kw">impl</span> <span class="ident">IExample3</span> <span class="kw">for</span> <span class="ident">HelloInterface</span> {
+    <span class="kw">fn</span> <span class="ident">function</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">work_queue</span>: <span class="ident">WorkQueue</span><span class="op">&lt;</span><span class="lifetime">&#39;static</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">IExample3SubsessionProxy</span>, <span class="ident">Error</span><span class="op">&gt;</span> {
+        <span class="kw">let</span> (<span class="ident">server</span>, <span class="ident">client</span>) <span class="op">=</span> <span class="ident">syscalls</span>::<span class="ident">create_session</span>(<span class="bool-val">false</span>, <span class="number">0</span>)<span class="question-mark">?</span>;
+        <span class="kw">let</span> <span class="ident">wrapper</span> <span class="op">=</span> <span class="ident">new_session_wrapper</span>(<span class="ident">work_queue</span>.<span class="ident">clone</span>(), <span class="ident">server</span>, <span class="ident">Subsession</span>, <span class="ident">Subsession</span>::<span class="ident">dispatch</span>);
+        <span class="ident">work_queue</span>.<span class="ident">spawn</span>(<span class="ident">FutureObj</span>::<span class="ident">new</span>(<span class="ident">Box</span>::<span class="ident">new</span>(<span class="ident">wrapper</span>)));
+        <span class="prelude-val">Ok</span>(<span class="ident">IExample3SubsessionProxy</span>::<span class="ident">from</span>(<span class="ident">client</span>))
+    }
+}
+
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>)]</span>
+<span class="kw">struct</span> <span class="ident">Subsession</span>;
+
+<span class="kw">impl</span> <span class="ident">IExample3Subsession</span> <span class="kw">for</span> <span class="ident">Subsession</span> {}
+
+</pre></div>
+<h3 id="asynchronous-traits" class="section-header"><a href="#asynchronous-traits">Asynchronous Traits</a></h3>
+<p>A server might want to wait for asynchronous events to occur before
+answering: for instance, the <code>read()</code> function of a filesystem might want
+to wait for an <a href="../../../sunrise_libuser/types/struct.IRQEvent.html" title="crate::types::IRQEvent">crate::types::IRQEvent</a> to get signaled before getting the
+data from the disk and returning it to the client.</p>
+<p>This is doable by using the Asynchronous traits. Those return a Future
+instead of directly returning the Result. This has one huge downside: the
+futures need to be Boxed, incuring a needless heap allocation. This should
+get fixed when <code>impl Trait</code> in traits or <code>async fn</code> in traits is
+implemented.</p>
+<p>Here's an example usage:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered">
+<span class="attribute">#![<span class="ident">feature</span>(<span class="ident">async_await</span>)]</span>
+<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">alloc</span>;
+
+<span class="kw">use</span> <span class="ident">core</span>::<span class="ident">future</span>::<span class="ident">Future</span>;
+<span class="kw">use</span> <span class="ident">alloc</span>::<span class="ident">boxed</span>::<span class="ident">Box</span>;
+<span class="kw">use</span> <span class="ident">sunrise_libuser</span>::<span class="ident">futures</span>::<span class="ident">WorkQueue</span>;
+<span class="kw">use</span> <span class="ident">sunrise_libuser</span>::<span class="ident">futures_rs</span>::<span class="ident">future</span>::<span class="ident">FutureObj</span>;
+<span class="kw">use</span> <span class="ident">sunrise_libuser</span>::<span class="ident">example</span>::<span class="ident">IExample4Async</span>;
+<span class="kw">use</span> <span class="ident">sunrise_libuser</span>::<span class="ident">types</span>::<span class="ident">SharedMemory</span>;
+<span class="kw">use</span> <span class="ident">sunrise_libuser</span>::<span class="ident">error</span>::{<span class="ident">Error</span>, <span class="ident">KernelError</span>};
+
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Default</span>, <span class="ident">Clone</span>)]</span>
+<span class="kw">struct</span> <span class="ident">HelloInterface</span>;
+
+<span class="kw">fn</span> <span class="ident">do_async_stuff</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="kw">impl</span> <span class="ident">Future</span><span class="op">&lt;</span><span class="ident">Output</span><span class="op">=</span>()<span class="op">&gt;</span> <span class="op">+</span> <span class="ident">Send</span> {
+    <span class="ident">futures</span>::<span class="ident">future</span>::<span class="ident">ready</span>(())
+}
+
+<span class="kw">impl</span> <span class="ident">IExample4Async</span> <span class="kw">for</span> <span class="ident">HelloInterface</span> {
+    <span class="kw">fn</span> <span class="ident">function</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">manager</span>: <span class="ident">WorkQueue</span><span class="op">&lt;</span><span class="lifetime">&#39;static</span><span class="op">&gt;</span>, <span class="ident">val</span>: <span class="kw-2">&amp;</span><span class="ident">u8</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">FutureObj</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">SharedMemory</span>, <span class="ident">Error</span><span class="op">&gt;</span><span class="op">&gt;</span> {
+        <span class="ident">FutureObj</span>::<span class="ident">new</span>(<span class="ident">Box</span>::<span class="ident">new</span>(<span class="kw">async</span> <span class="kw">move</span> {
+            <span class="ident">do_async_stuff</span>().<span class="kw">await</span>;
+            <span class="prelude-val">Err</span>(<span class="ident">KernelError</span>::<span class="ident">PortRemoteDead</span>.<span class="ident">into</span>())
+        }))
+    }
+}
+
+</pre></div>
+</div><h2 id='modules' class='section-header'><a href="#modules">Modules</a></h2>
+<table><tr class='module-item'><td><a class="mod" href="hrtb_hack/index.html" title='sunrise_libuser::ipc::server::hrtb_hack mod'>hrtb_hack</a></td><td class='docblock-short'><p>Ideally, that's what we would want to write
+async fn new_session_wrapper<F>(mut dispatch: F) -&gt; ()
+where
+F: for&lt;'a&gt; FnMut&lt;(&amp;'a mut <a href="https://doc.rust-lang.org/nightly/std/primitive.u8.html" title="u8">u8</a>,)&gt;,
+for&lt;'a&gt; &lt;F as FnOnce&lt;(&amp;'a mut <a href="https://doc.rust-lang.org/nightly/std/primitive.u8.html" title="u8">u8</a>,)&gt;&gt;::Output: Future&lt;Output = Result&lt;(), ()&gt;&gt;,
+{
+// Session wrapper code
+}
+But the compiler seems to have trouble reasoning about associated types
+in an HRTB context (maybe that's just not possible ? Not sure).</p>
+</td></tr></table><h2 id='structs' class='section-header'><a href="#structs">Structs</a></h2>
+<table><tr class='module-item'><td><a class="struct" href="struct.Align16.html" title='sunrise_libuser::ipc::server::Align16 struct'>Align16</a></td><td class='docblock-short'><p>Wrapper struct that forces the alignment to 0x10. Somewhat necessary for the
+IPC command buffer.</p>
+</td></tr></table><h2 id='functions' class='section-header'><a href="#functions">Functions</a></h2>
+<table><tr class='module-item'><td><a class="fn" href="fn.common_port_handler.html" title='sunrise_libuser::ipc::server::common_port_handler fn'>common_port_handler</a></td><td class='docblock-short'><p>Infinite loop future that waits for <code>port</code> to get signaled, then accepts a
+new session on the port, creates a new object backing the session using
+<code>T::default()</code>, and finally spawns a new session wrapper future using
+<a href="../../../sunrise_libuser/ipc/server/fn.new_session_wrapper.html" title="new_session_wrapper()">new_session_wrapper()</a>.</p>
+</td></tr><tr class='module-item'><td><a class="fn" href="fn.control_dispatch.html" title='sunrise_libuser::ipc::server::control_dispatch fn'>control_dispatch</a></td><td class='docblock-short'><p>Implement the Control ipc cmd types.</p>
+</td></tr><tr class='module-item'><td><a class="fn" href="fn.encode_bytes.html" title='sunrise_libuser::ipc::server::encode_bytes fn'>encode_bytes</a></td><td class='docblock-short'><p>Encode an 8-character service string into an u64</p>
+</td></tr><tr class='module-item'><td><a class="fn" href="fn.managed_port_handler.html" title='sunrise_libuser::ipc::server::managed_port_handler fn'>managed_port_handler</a></td><td class='docblock-short'><p>Creates a port through <a href="../../../sunrise_libuser/syscalls/fn.manage_named_port.html" title="syscalls::manage_named_port()">syscalls::manage_named_port()</a> with the given name,
+and returns a future which will handle the port - that is, it
+will continuously accept new sessions on the port, and create backing
+objects through <code>T::default()</code>, and spawn a top-level future handling that
+sesion with <a href="../../../sunrise_libuser/ipc/server/fn.new_session_wrapper.html" title="new_session_wrapper()">new_session_wrapper()</a>.</p>
+</td></tr><tr class='module-item'><td><a class="fn" href="fn.new_session_wrapper.html" title='sunrise_libuser::ipc::server::new_session_wrapper fn'>new_session_wrapper</a></td><td class='docblock-short'><p>Creates a new top-level future that handles session.</p>
+</td></tr><tr class='module-item'><td><a class="fn" href="fn.port_handler.html" title='sunrise_libuser::ipc::server::port_handler fn'>port_handler</a></td><td class='docblock-short'><p>Creates a port through <a href="../../../sunrise_libuser/sm/struct.IUserInterfaceProxy.html#method.register_service" title="crate::sm::IUserInterfaceProxy::register_service()">crate::sm::IUserInterfaceProxy::register_service()</a>
+with the given name, and returns a future which will handle the port - that
+is, it will continuously accept new sessions on the port, and create backing
+objects through <code>T::default()</code>, and spawn a top-level future handling that
+sesion with <a href="../../../sunrise_libuser/ipc/server/fn.new_session_wrapper.html" title="new_session_wrapper()">new_session_wrapper()</a>.</p>
+</td></tr></table></section><section id="search" class="content hidden"></section><section class="footer"></section><script>window.rootPath = "../../../";window.currentCrate = "sunrise_libuser";</script><script src="../../../main.js"></script><script defer src="../../../search-index.js"></script></body></html>

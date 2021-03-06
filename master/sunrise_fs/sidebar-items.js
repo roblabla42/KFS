@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["main",""]],"mod":[["detail","Detail module"],["interface","Interface module This module contains trait that are used in the filesystem."],["ipc","IPC module This contains all IPC interfaces definition of the filesystem."]],"static":[["CAPABILITIES",""],["HEADER",""]],"type":[["LibUserResult","A libuser result."]]});

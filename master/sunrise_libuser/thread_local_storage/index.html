@@ -1,0 +1,57 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="API documentation for the Rust `thread_local_storage` mod in crate `sunrise_libuser`."><meta name="keywords" content="rust, rustlang, rust-lang, thread_local_storage"><title>sunrise_libuser::thread_local_storage - Rust</title><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../dark.css"><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script src="../../storage.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="shortcut icon" href="../../favicon.ico"><style type="text/css">#crate-search{background-image:url("../../down-arrow.svg");}</style></head><body class="rustdoc mod"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu">&#9776;</div><a href='../../sunrise_libuser/index.html'><div class='logo-container'><img src='../../rust-logo.png' alt='logo'></div></a><p class='location'>Module thread_local_storage</p><div class="sidebar-elems"><div class="block items"><ul><li><a href="#structs">Structs</a></li><li><a href="#statics">Statics</a></li><li><a href="#functions">Functions</a></li></ul></div><p class='location'><a href='../index.html'>sunrise_libuser</a></p><script>window.sidebarCurrent = {name: 'thread_local_storage', ty: 'mod', relpath: '../'};</script><script defer src="../sidebar-items.js"></script></div></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!"><img src="../../brush.svg" width="18" alt="Pick another theme!"></button><div id="theme-choices"></div></div><script src="../../theme.js"></script><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><a id="settings-menu" href="../../settings.html"><img src="../../wheel.svg" width="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><h1 class='fqn'><span class='out-of-band'><span id='render-detail'><a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class='inner'>&#x2212;</span>]</a></span><a class='srclink' href='../../src/sunrise_libuser/thread_local_storage.rs.html#1-357' title='goto source code'>[src]</a></span><span class='in-band'>Module <a href='../index.html'>sunrise_libuser</a>::<wbr><a class="mod" href=''>thread_local_storage</a></span></h1><div class='docblock'><p>Thread Local Storage on x86</p>
+<h1 id="usage" class="section-header"><a href="#usage">Usage</a></h1>
+<p>You declare a thread-local using the <a href="https://github.com/rust-lang/rust/issues/10310">#[thread_local] attribute</a> :</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered">
+<span class="attribute">#![<span class="ident">feature</span>(<span class="ident">thread_local</span>)]</span>
+<span class="attribute">#[<span class="ident">thread_local</span>]</span>
+<span class="kw">static</span> <span class="ident">MY_THREAD_LOCAL</span>: <span class="ident">core</span>::<span class="ident">cell</span>::<span class="ident">Cell</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">core</span>::<span class="ident">cell</span>::<span class="ident">Cell</span>::<span class="ident">new</span>(<span class="number">42</span>);</pre></div>
+<p>and access it as if it was a regular static, only that each thread will have its own view of
+the static.</p>
+<p>The compiler is responsible for generating code that will access the right address, provided
+we configured TLS correctly.</p>
+<h5 id="early-startup" class="section-header"><a href="#early-startup">Early startup</a></h5>
+<p>Note that you can't access a thread-local static before <a href="../../sunrise_libuser/threads/fn.init_main_thread.html"><code>init_main_thread</code></a> is called, because
+the thread-local area for the main thread isn't initialized yet, and this will likely result to
+a page fault or UB.</p>
+<h1 id="inner-workings" class="section-header"><a href="#inner-workings">Inner workings</a></h1>
+<p>We implement the TLS according to conventions laid out by <a href="https://web.archive.org/web/20190710135250/https://akkadia.org/drepper/tls.pdf">Ulrich Drepper's paper on TLS</a> which
+is followed by LLVM and most compilers.</p>
+<p>Since we're running on i386, we're following variant II.</p>
+<p>Each thread's <code>gs</code> segment points to a thread local memory area where thread-local statics live.
+thread-local statics are simply accessed through an offset from <code>gs</code>.</p>
+<p>The linker is in charge of creating an ELF segment of type <code>PT_TLS</code> where an initialization image
+for cpu local regions can be found, and is meant to be copy-pasted for every thread we create.</p>
+<h5 id="on-sunriseos" class="section-header"><a href="#on-sunriseos">on SunriseOS</a></h5>
+<p>On Surnise, the area where <code>gs</code> points to is per-thread and user-controlled, we set it at the
+startup of every thread with the <a href="../../sunrise_libuser/syscalls/fn.set_thread_area.html"><code>set_thread_area</code></a> syscall.</p>
+<p>The TLS initialisation image is supposed to be retrieved from our own program headers, which is
+a really weird design.
+Since we don't have access to our program headers, we instead use the linker to expose the following
+symbols:</p>
+<ul>
+<li><a href="../../sunrise_libuser/thread_local_storage/static.__tls_init_image_addr__.html"><code>__tls_init_image_addr__</code></a>, <code>p_vaddr</code>: the address of our TLS initialisation image.</li>
+<li><a href="../../sunrise_libuser/thread_local_storage/static.__tls_file_size__.html"><code>__tls_file_size__</code></a>, <code>p_filesz</code>: the size of our TLS initialisation image.</li>
+<li><a href="../../sunrise_libuser/thread_local_storage/static.__tls_mem_size__.html"><code>__tls_mem_size__</code></a>, <code>p_memsz</code>: the total size of our TLS segment.</li>
+<li><a href="../../sunrise_libuser/thread_local_storage/static.__tls_align__.html"><code>__tls_align__</code></a>, <code>p_align</code>: the alignment of our TLS segment.</li>
+</ul>
+<p>Those symbols are the addresses of the initialization in our <code>.tdata</code>, so it can directly be copied.</p>
+<h5 id="dtv-and-__tls_get_addr" class="section-header"><a href="#dtv-and-__tls_get_addr">dtv and <code>__tls_get_addr</code></a></h5>
+<p>Since we don't do dynamic loading (yet ?), we know our TLS model will be static (either
+Initial Exec or Local Exec).
+Those models always access thread-locals directly via <code>gs</code>, and always short-circuit the dtv.</p>
+<p>So we don't even bother allocating a dtv array at all. Neither do we define a <code>__tls_get_addr</code>
+function.</p>
+<p>This might change in the future when we will want to support dynamic loading.</p>
+</div><h2 id='structs' class='section-header'><a href="#structs">Structs</a></h2>
+<table><tr class='module-item'><td><a class="struct" href="struct.ThreadControlBlock.html" title='sunrise_libuser::thread_local_storage::ThreadControlBlock struct'>ThreadControlBlock</a></td><td class='docblock-short'><p>Elf TLS TCB</p>
+</td></tr><tr class='module-item'><td><a class="struct" href="struct.ThreadLocalStaticRegion.html" title='sunrise_libuser::thread_local_storage::ThreadLocalStaticRegion struct'>ThreadLocalStaticRegion</a></td><td class='docblock-short'><p>Represents an allocated thread local static region.</p>
+</td></tr><tr class='module-item'><td><a class="struct" href="struct.TlsElf.html" title='sunrise_libuser::thread_local_storage::TlsElf struct'>TlsElf</a></td><td class='docblock-short'><p>The Thread Local Storage manager for a thread</p>
+</td></tr></table><h2 id='statics' class='section-header'><a href="#statics">Statics</a></h2>
+<table><tr class='module-item'><td><a class="static" href="static.__tls_align__.html" title='sunrise_libuser::thread_local_storage::__tls_align__ static'>__tls_align__</a></td><td class='docblock-short'><p>The alignment of the TLS segment.</p>
+</td></tr><tr class='module-item'><td><a class="static" href="static.__tls_file_size__.html" title='sunrise_libuser::thread_local_storage::__tls_file_size__ static'>__tls_file_size__</a></td><td class='docblock-short'><p>The size of the TLS initialisation image in our <code>.tdata</code>.</p>
+</td></tr><tr class='module-item'><td><a class="static" href="static.__tls_init_image_addr__.html" title='sunrise_libuser::thread_local_storage::__tls_init_image_addr__ static'>__tls_init_image_addr__</a></td><td class='docblock-short'><p>The address of the start of the TLS initialisation image in our <code>.tdata</code>.</p>
+</td></tr><tr class='module-item'><td><a class="static" href="static.__tls_mem_size__.html" title='sunrise_libuser::thread_local_storage::__tls_mem_size__ static'>__tls_mem_size__</a></td><td class='docblock-short'><p>The total memsize of the TLS segment: .tdata + .tbss</p>
+</td></tr></table><h2 id='functions' class='section-header'><a href="#functions">Functions</a></h2>
+<table><tr class='module-item'><td><a class="fn" href="fn.tls_align_up.html" title='sunrise_libuser::thread_local_storage::tls_align_up fn'>tls_align_up</a></td><td class='docblock-short'><p>The <code>round</code> function, as defined in section 3.0:</p>
+</td></tr></table></section><section id="search" class="content hidden"></section><section class="footer"></section><script>window.rootPath = "../../";window.currentCrate = "sunrise_libuser";</script><script src="../../main.js"></script><script defer src="../../search-index.js"></script></body></html>

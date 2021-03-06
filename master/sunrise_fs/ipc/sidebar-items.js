@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["Directory","Represent a file in the IPC."],["File","Represent a file in the IPC."],["FileSystem","Represent a filesystem in the IPC."],["FileSystemService","Entry point of the file system interface."],["Pipe","Represent a file in the IPC."],["Storage","This is the ipc interface for a raw device, usually a block device."]]});

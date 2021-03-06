@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["get_kernel_memory","Locks the KERNEL_MEMORY"]],"static":[["KERNEL_MEMORY","A mutex protecting the KernelMemory manager."]],"struct":[["KernelMemory","A struct that acts on KernelLand and RecursiveTablesLand."]]});

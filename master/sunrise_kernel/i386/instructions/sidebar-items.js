@@ -1,0 +1,1 @@
+initSidebarItems({"mod":[["interrupts","Interrupt disabling functionality."],["segmentation","Provides functions to read and write segment registers."],["tables","Instructions for loading descriptor tables (GDT, IDT, etc.)."]]});

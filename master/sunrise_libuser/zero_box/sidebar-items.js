@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["ZeroBox","A wrapper around a Box that can initialize itself directly on the heap."]],"trait":[["ZeroInitialized","A marker trait indicating that zero values is a valid representation for this type."]]});

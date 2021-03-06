@@ -1,0 +1,1 @@
+initSidebarItems({"enum":[["KernelError","Kernel Error."]],"struct":[["UserspaceError","Kernel syscall error codes."]]});

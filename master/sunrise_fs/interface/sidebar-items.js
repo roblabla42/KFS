@@ -1,0 +1,1 @@
+initSidebarItems({"mod":[["driver","Driver interfaces Allows to detect and select filesystem drivers (e.g. FAT32, ext2, nfs, ...) accordingly."],["filesystem","Interface to manipulate filesystem"],["storage","Storage related interfaces Those interface allows to simplify IStorage <=> StorageDevice layer."]]});

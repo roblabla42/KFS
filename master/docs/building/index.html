@@ -1,0 +1,46 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="API documentation for the Rust `building` mod in crate `docs`."><meta name="keywords" content="rust, rustlang, rust-lang, building"><title>docs::building - Rust</title><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../dark.css"><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script src="../../storage.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="shortcut icon" href="../../favicon.ico"><style type="text/css">#crate-search{background-image:url("../../down-arrow.svg");}</style></head><body class="rustdoc mod"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu">&#9776;</div><a href='../../docs/index.html'><div class='logo-container'><img src='../../rust-logo.png' alt='logo'></div></a><p class='location'>Module building</p><div class="sidebar-elems"><p class='location'><a href='../index.html'>docs</a></p><script>window.sidebarCurrent = {name: 'building', ty: 'mod', relpath: '../'};</script><script defer src="../sidebar-items.js"></script></div></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!"><img src="../../brush.svg" width="18" alt="Pick another theme!"></button><div id="theme-choices"></div></div><script src="../../theme.js"></script><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><a id="settings-menu" href="../../settings.html"><img src="../../wheel.svg" width="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><h1 class='fqn'><span class='out-of-band'><span id='render-detail'><a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class='inner'>&#x2212;</span>]</a></span><a class='srclink' href='../../src/docs/main.rs.html#8-10' title='goto source code'>[src]</a></span><span class='in-band'>Module <a href='../index.html'>docs</a>::<wbr><a class="mod" href=''>building</a></span></h1><div class='docblock'><h1 id="build-instructions" class="section-header"><a href="#build-instructions">Build Instructions</a></h1><h2 id="rust-toolchain" class="section-header"><a href="#rust-toolchain">Rust toolchain</a></h2>
+<p>SunriseOS is written entirely in Rust and only requires a working Rust Toolchain
+of the right version to work. It is recommended to use <code>rustup</code> to manage your
+Rust installation, as it will automatically download the right version of the
+toolchain to build SunriseOS when running <code>cargo</code>.</p>
+<p>If you don't want to (or can't) use <code>rustup</code>, you should check the
+<code>rust-toolchain</code> version to find out which version of the rust compiler you
+should install.</p>
+<h2 id="build-orchestration" class="section-header"><a href="#build-orchestration">Build orchestration</a></h2>
+<p>SunriseOS is made of many different components that work together to build the
+full system. Manually building all the required parts would be tedious, so we
+set up <code>cargo-make</code> to orchestrate the build.</p>
+<p>It can be installed through <code>cargo install cargo-make</code>. You'll need to make sure
+you have a version that meets our minimum required versions. Check out the
+<a href="#versions">versions section</a> to find out what the minimum version of cargo-make
+is necessary to build SunriseOS.</p>
+<p>We use quite a few other tools in the process of building SunriseOS. Thankfully,
+cargo-make will take care of installing all the others, and of updating them if
+needed. However, if a build fails, make sure to check out the <a href="#versions">versions
+section</a> and ensure all the tools are installed and have the
+appropriate version.</p>
+<h2 id="building" class="section-header"><a href="#building">Building</a></h2>
+<p>To build, simply use <code>cargo make iso --profile production</code>. This will generate a
+live CD called <code>os.iso</code> which can be booted from to run SunriseOS.
+<code>cargo make iso</code> can be used to generate a live CD running in debug mode.</p>
+<h2 id="qemu" class="section-header"><a href="#qemu">Qemu</a></h2>
+<p>First, ensure you have qemu installed, as <code>cargo-make</code> will not automatically
+install it (See the <a href="#versions">version sections</a>). Then, run <code>cargo make qemu --profile production</code> to build and run the kernel in QEmu. It will open a display
+server on VNC port 5900 (overridable by setting the <code>VNC_PORT</code> environment
+variable) through which the user can interact. Logs going over serial port will be
+printed on stdout.</p>
+<h2 id="versions" class="section-header"><a href="#versions">Versions</a></h2>
+<ul>
+<li>rust: <code>nightly-2020-05-27</code>
+<ul>
+<li>clippy</li>
+<li>rust-src</li>
+</ul>
+</li>
+<li>cargo-make: <code>0.31.0</code></li>
+<li>xargo: <code>0.3.18</code></li>
+<li>mkisofs-rs: <code>0.1.1</code></li>
+<li>qemu-system-i386: <code>4.0.50</code></li>
+<li>cargo-travis: <code>https://github.com/roblabla/cargo-travis</code> branch <code>doc-upload-target</code></li>
+</ul>
+</div></section><section id="search" class="content hidden"></section><section class="footer"></section><script>window.rootPath = "../../";window.currentCrate = "docs";</script><script src="../../main.js"></script><script defer src="../../search-index.js"></script></body></html>

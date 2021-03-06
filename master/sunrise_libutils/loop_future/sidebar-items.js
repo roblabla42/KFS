@@ -1,0 +1,1 @@
+initSidebarItems({"enum":[["Loop","The status of a `loop_fn` loop."]],"fn":[["loop_fn","Creates a new future implementing a tail-recursive loop."]],"struct":[["LoopFn","A future implementing a tail-recursive loop."]]});

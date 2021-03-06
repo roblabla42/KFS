@@ -1,0 +1,1 @@
+initSidebarItems({"constant":[["BLOCK_SIZE","Size of a block."],["BLOCK_SIZE_U64","Size of an AHCI block in u64."]],"fn":[["main",""],["write_file_to_filesystem","Write a std file to FAT filesystem."],["write_tempate_to_filesystem","Write the template directory content to a FAT fileystem"]],"mod":[["gpt","GPT definition module."]]});

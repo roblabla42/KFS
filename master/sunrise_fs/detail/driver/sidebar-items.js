@@ -1,0 +1,1 @@
+initSidebarItems({"mod":[["fat","FAT driver implementation layer"]],"struct":[["AhciDiskStorage","A wrapper to a ahci IDisk."],["DRIVER_MANAGER",""],["DriverManager","Instance handling drivers registration and usage."]],"type":[["BoxedIStorage","A boxed IStorage using the proper Error type."],["PartitionHashMap","A type to let clippy slide over it."]]});

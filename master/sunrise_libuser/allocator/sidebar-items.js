@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["Allocator","The libuser heap allocator."]]});

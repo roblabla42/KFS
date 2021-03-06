@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["connect_to_named_port","Connects to a named port."],["create_named_port","Creates a named port."]],"mod":[["port","IPC Port"],["session","IPC Sessions"]],"struct":[["NAMED_PORTS",""]]});

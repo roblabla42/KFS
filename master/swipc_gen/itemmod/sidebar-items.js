@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["ItemMod","A module or module declaration: `mod m` or `mod m { ... }`."]]});

@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["check_lower_than_usize","Checks the given u64 fits an usize on this architecture."],["check_nonzero_length","checks that a length is not 0."],["check_size_aligned","Checks that a size meets the given alignment."]]});

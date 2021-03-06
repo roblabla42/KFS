@@ -1,0 +1,93 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="API documentation for the Rust `trap_gate_asm` macro in crate `sunrise_kernel`."><meta name="keywords" content="rust, rustlang, rust-lang, trap_gate_asm"><title>sunrise_kernel::trap_gate_asm - Rust</title><link rel="stylesheet" type="text/css" href="../normalize.css"><link rel="stylesheet" type="text/css" href="../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../dark.css"><link rel="stylesheet" type="text/css" href="../light.css" id="themeStyle"><script src="../storage.js"></script><noscript><link rel="stylesheet" href="../noscript.css"></noscript><link rel="shortcut icon" href="../favicon.ico"><style type="text/css">#crate-search{background-image:url("../down-arrow.svg");}</style></head><body class="rustdoc macro"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu">&#9776;</div><a href='../sunrise_kernel/index.html'><div class='logo-container'><img src='../rust-logo.png' alt='logo'></div></a><div class="sidebar-elems"><p class='location'><a href='index.html'>sunrise_kernel</a></p><script>window.sidebarCurrent = {name: 'trap_gate_asm', ty: 'macro', relpath: ''};</script><script defer src="sidebar-items.js"></script></div></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!"><img src="../brush.svg" width="18" alt="Pick another theme!"></button><div id="theme-choices"></div></div><script src="../theme.js"></script><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><a id="settings-menu" href="../settings.html"><img src="../wheel.svg" width="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><h1 class='fqn'><span class='out-of-band'><span id='render-detail'><a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class='inner'>&#x2212;</span>]</a></span><a class='srclink' href='../src/sunrise_kernel/i386/interrupt_service_routines.rs.html#234-301' title='goto source code'>[src]</a></span><span class='in-band'>Macro <a href='index.html'>sunrise_kernel</a>::<wbr><a class="macro" href=''>trap_gate_asm</a></span></h1><div class="docblock type-decl hidden-by-usual-hider"><div class="example-wrap"><pre class="rust macro">
+<span class="macro">macro_rules</span><span class="macro">!</span> <span class="ident">trap_gate_asm</span> {
+    (<span class="ident">has_errorcode</span>: <span class="bool-val">true</span>) <span class="op">=</span><span class="op">&gt;</span> { ... };
+    (<span class="ident">has_errorcode</span>: <span class="bool-val">false</span>) <span class="op">=</span><span class="op">&gt;</span> { ... };
+}</pre></div>
+</div><div class='docblock'><p>The exception/syscall handler asm wrapper.</p>
+<p>When the cpu handles a Trap/Interrupt gate, it:</p>
+<ol>
+<li>decides if it must switch stacks. If it does, we configured it to switch to the current
+thread's kernel stack. It will then push userspace <code>ss</code> and <code>esp</code>.</li>
+<li>pushes <code>eflags</code>, <code>cs</code>, <code>eip</code>.</li>
+<li>optionally pushes an errorcode, depending on the exception.</li>
+</ol>
+<p>This is just enough for the cpu to restore the context on <code>iret</code> and optionally switch back to
+the userspace stack.</p>
+<p>On those cpu-pushed registers, we push the rest of the hardware context, so we can restore it
+at the end of isr. By doing so, we're constructing a <a href="../sunrise_kernel/i386/interrupt_service_routines/struct.UserspaceHardwareContext.html">UserspaceHardwareContext</a> on the stack,
+but whose <code>eflags</code>, <code>cs</code> and <code>eip</code> fields point to words that were actually pushed by cpu.</p>
+<p>We then call the isr, passing it a pointer to this structure. The isr is free to modify the
+backed-up registers, including the cpu-pushed ones, and those modification will be popped into
+the registers at the end of the isr, effectively changing context after we <code>iret</code>.</p>
+<h2 id="diagram" class="section-header"><a href="#diagram">Diagram</a></h2>
+<pre><code class="language-txt">     Privilege changed            Privilege unchanged
+    (e.g. int, syscall)           (e.g. kernel fault,
+                                   int during kernel)
+
+        Page fault
+    +----------------+            +----------------+
+    |       SS       |            |                |
+    +----------------+            +----------------+
+    |      ESP       |            |                |
+    +----------------+            +----------------+
+    |     EFLAGS     | &lt;+      +&gt; |     EFLAGS     | &lt;-+ &lt;-+
+    +----------------+  |      |  +----------------+   |   |
+    |       CS       |  |      |  |       CS       |   |   |
+    +----------------+  |      |  +----------------+   |   | Registers pushed by CPU
+    |      EIP       |  |      |  |      EIP       |   |   |
+    +----------------+  |      |  +----------------+   |   |
+    |   Error code   |  |      |  |   Error code   | &lt;-+   |
+    +****************+  |      |  +****************+       |
+    |   Pushed eax   |  |      |  |   Pushed eax   |       |
+    +----------------+  |      |  +----------------+       |
+    |   Pushed ebx   |  |      |  |   Pushed ebx   |       |
+    +----------------+  |      |  +----------------+       | struct UserspaceHardwareContext
+    |   Pushed ecx   |  |      |  |   Pushed ecx   |       |      passed as an argument
+    +----------------+  |      |  +----------------+       |
+    |   Pushed edx   |  |      |  |   Pushed edx   |       |
+    +----------------+  |      |  +----------------+       |
+    |   Pushed esi   |  |      |  |   Pushed esi   |       |
+    +----------------+  |      |  +----------------+       |
+    |   Pushed edi   |  |      |  |   Pushed edi   |       |
+    +----------------+  |      |  +----------------+       |
+    |   Pushed ebp   |  |      |  |   Pushed ebp   |       |
+    +----------------+  |      |  +----------------+       |
+    |   Pushed gs    |  |      |  |   Pushed gs    |       |
+    +----------------+  |      |  +----------------+       |
+    | Pushed esp cpy |  |      |  | Pushed esp cpy |     &lt;-+
+    +----------------+  |      |  +----------------+
+    | Pushed arg ptr | -+      +- | Pushed arg ptr |
+    +----------------+            +----------------+
+</code></pre>
+<h5 id="esp" class="section-header"><a href="#esp">ESP</a></h5>
+<p>The only register that can't be modified by the isr is the <code>esp</code> register.</p>
+<p>Because this register is only pushed by the cpu when Privilege changed, we must take extra
+precautions when reading/writting it from the stack, if we don't want to page fault.</p>
+<p>When reading it we use the pushed <code>cs</code> to determine if we did change privilege, in which case
+we proceed to read it, otherwise we can assume we're running on the same stack,
+and deduce it from our current <code>esp</code> value.</p>
+<p>If the isr modifies <code>esp</code> and we're in the Privilege Unchanged situation, there is no way
+for us to make the cpu use this <code>esp</code> after we <code>iret</code>, that is make the change effective.
+For this reason we never bother to copy the <code>esp</code> from the UserspaceHardwareContext back to the stack.</p>
+<h2 id="usage" class="section-header"><a href="#usage">Usage</a></h2>
+<p>This macro is intended to be inserted in an <code>llvm_asm!()</code> block, like this:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered">
+<span class="kw">extern</span> <span class="string">&quot;C&quot;</span> <span class="kw">fn</span> <span class="ident">my_isr_function</span>(<span class="ident">userspace_context</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">UserspaceHardwareContext</span>) {
+    <span class="comment">// irq handling here</span>
+}
+
+<span class="kw">unsafe</span> {
+    <span class="macro">llvm_asm</span><span class="macro">!</span>(<span class="macro">trap_gate_asm</span><span class="macro">!</span>(<span class="ident">has_errorcode</span>: <span class="bool-val">false</span>)
+        :: <span class="string">&quot;i&quot;</span>(<span class="ident">my_isr_function</span> <span class="kw">as</span> <span class="kw-2">*</span><span class="kw">const</span> <span class="ident">u8</span>) :: <span class="string">&quot;volatile&quot;</span>, <span class="string">&quot;intel&quot;</span>);
+}</pre></div>
+<p>Because <code>llvm_asm!()</code> expects a literal, <code>trap_gate_asm</code> needs to be macro.</p>
+<h2 id="error-code" class="section-header"><a href="#error-code">Error code</a></h2>
+<p>Some exceptions push an additional errcode on the stack and some don't.</p>
+<p>When one is pushed by the cpu, the isr is still expected to pop it before calling <code>iret</code>.</p>
+<p>Because we want to handle both cases in a similar way, for exceptions that are errorcode-less
+we push a fake error code on the stack as if the cpu did it, and handle everything else in
+one code path.</p>
+<p>When returning from the exception, the isr will unconditionally pop the errcode,
+with no regards for whether it was real or not, and call <code>iret</code>.</p>
+</div></section><section id="search" class="content hidden"></section><section class="footer"></section><script>window.rootPath = "../";window.currentCrate = "sunrise_kernel";</script><script src="../main.js"></script><script defer src="../search-index.js"></script></body></html>

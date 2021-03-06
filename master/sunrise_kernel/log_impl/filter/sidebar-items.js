@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["enabled",""],["parse_spec","Parse a logging specification string (e.g: \"crate1,crate2::mod3,crate3::x=error/foo\") and return a vector with log directives."]],"mod":[["inner",""]],"struct":[["Builder","A builder for a log filter."],["Directive",""],["Filter","A log filter."]]});

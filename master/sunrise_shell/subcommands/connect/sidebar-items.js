@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["main","Test function ensuring SM's get_service works."]],"static":[["HELP","Help string."]]});

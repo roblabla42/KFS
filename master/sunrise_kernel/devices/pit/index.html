@@ -1,0 +1,72 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="API documentation for the Rust `pit` mod in crate `sunrise_kernel`."><meta name="keywords" content="rust, rustlang, rust-lang, pit"><title>sunrise_kernel::devices::pit - Rust</title><link rel="stylesheet" type="text/css" href="../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../dark.css"><link rel="stylesheet" type="text/css" href="../../../light.css" id="themeStyle"><script src="../../../storage.js"></script><noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="shortcut icon" href="../../../favicon.ico"><style type="text/css">#crate-search{background-image:url("../../../down-arrow.svg");}</style></head><body class="rustdoc mod"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu">&#9776;</div><a href='../../../sunrise_kernel/index.html'><div class='logo-container'><img src='../../../rust-logo.png' alt='logo'></div></a><p class='location'>Module pit</p><div class="sidebar-elems"><div class="block items"><ul><li><a href="#structs">Structs</a></li><li><a href="#enums">Enums</a></li><li><a href="#constants">Constants</a></li><li><a href="#functions">Functions</a></li></ul></div><p class='location'><a href='../../index.html'>sunrise_kernel</a>::<wbr><a href='../index.html'>devices</a></p><script>window.sidebarCurrent = {name: 'pit', ty: 'mod', relpath: '../'};</script><script defer src="../sidebar-items.js"></script></div></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!"><img src="../../../brush.svg" width="18" alt="Pick another theme!"></button><div id="theme-choices"></div></div><script src="../../../theme.js"></script><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><a id="settings-menu" href="../../../settings.html"><img src="../../../wheel.svg" width="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><h1 class='fqn'><span class='out-of-band'><span id='render-detail'><a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class='inner'>&#x2212;</span>]</a></span><a class='srclink' href='../../../src/sunrise_kernel/devices/pit.rs.html#1-227' title='goto source code'>[src]</a></span><span class='in-band'>Module <a href='../../index.html'>sunrise_kernel</a>::<wbr><a href='../index.html'>devices</a>::<wbr><a class="mod" href=''>pit</a></span></h1><div class='docblock'><p>Programmable Interval Timer</p>
+<h3 id="channels" class="section-header"><a href="#channels">channels</a></h3>
+<p>There are 3 channels :</p>
+<ul>
+<li>
+<p>channel 0, wired to irq0.
+We use this one in rate generator mode, to keep track of the time</p>
+</li>
+<li>
+<p>channel 1, &quot;unusable, and may not even exist&quot; ... whoah</p>
+</li>
+<li>
+<p>channel 2, wired to pc speaker.
+We use this one in &quot;one shot&quot; mode to implement a simple wait function.
+Output is ANDed with a gate controlled by port 0x61 bit #1 before going to the pc speaker,
+we use this to enable/disable the speaker.
+However the channel can only track one countdown at a time,
+so we have to switch to channel 0 timers when we want to wait
+as soon as we have interruptions working</p>
+</li>
+</ul>
+<h3 id="operating-modes" class="section-header"><a href="#operating-modes">operating modes</a></h3>
+<p>Each channel can operate in different modes. The ones we use are:</p>
+<ul>
+<li>
+<p>Mode 0 - Countdown (poorly named &quot;Interrupt on Terminal Count&quot;).
+Used on channel 2 to create countdowns.
+Set the reset value, countdowns starts.
+When countdown goes to 0, OUT goes HIGH, and stays high.</p>
+</li>
+<li>
+<p>Mode 2 - Rate generator.
+Used on channel 0 to create recurring irqs.
+Set the reset value. Countdown starts.
+When countdown goes to 0, OUT goes LOW for 1 clock cycle, and HIGH again,
+and countdown restarts.</p>
+</li>
+</ul>
+<h3 id="commands" class="section-header"><a href="#commands">commands</a></h3>
+<p>Pit commands are sent on port 0x43.
+See <a href="https://wiki.osdev.org/Programmable_Interval_Timer#I.2FO_Ports">OSDEV</a></p>
+<p>To write channel reload values we always use the Access mode &quot;lobyte/hibyte&quot;</p>
+<h3 id="port-0x61" class="section-header"><a href="#port-0x61">port 0x61</a></h3>
+<p>The PIT makes great use of the IO port 0x61 :</p>
+<ul>
+<li>bit #0 is channel 2 GATE control</li>
+<li>bit #1 is SPKR control</li>
+<li>bit #4 is channel 1 OUT status</li>
+<li>bit #5 is channel 2 OUT status</li>
+</ul>
+<h2 id="references" class="section-header"><a href="#references">References</a></h2>
+<ul>
+<li><a href="https://wiki.osdev.org/Programmable_Interval_Timer">OSDEV</a></li>
+<li><a href="https://www.cs.usfca.edu/%7Ecruse/cs630f08/lesson15.ppt">this very good ppt</a></li>
+</ul>
+</div><h2 id='structs' class='section-header'><a href="#structs">Structs</a></h2>
+<table><tr class='module-item'><td><a class="struct" href="struct.PITChannel2.html" title='sunrise_kernel::devices::pit::PITChannel2 struct'>PITChannel2</a></td><td class='docblock-short'><p>Channel 2</p>
+</td></tr><tr class='module-item'><td><a class="struct" href="struct.PITPorts.html" title='sunrise_kernel::devices::pit::PITPorts struct'>PITPorts</a></td><td class='docblock-short'><p>We put the PIT ports in a structure to have them under a single mutex</p>
+</td></tr><tr class='module-item'><td><a class="struct" href="struct.PIT_PORTS.html" title='sunrise_kernel::devices::pit::PIT_PORTS struct'>PIT_PORTS</a></td><td class='docblock-short'><p>The mutex wrapping the ports</p>
+</td></tr><tr class='module-item'><td><a class="struct" href="struct.Port61Flags.html" title='sunrise_kernel::devices::pit::Port61Flags struct'>Port61Flags</a></td><td class='docblock-short'><p>The port 0x61 flags we use.</p>
+</td></tr></table><h2 id='enums' class='section-header'><a href="#enums">Enums</a></h2>
+<table><tr class='module-item'><td><a class="enum" href="enum.ChannelSelector.html" title='sunrise_kernel::devices::pit::ChannelSelector enum'>ChannelSelector</a></td><td class='docblock-short'><p>Used internally to select which channel to apply operations to.</p>
+</td></tr></table><h2 id='constants' class='section-header'><a href="#constants">Constants</a></h2>
+<table><tr class='module-item'><td><a class="constant" href="constant.CHAN_0_DIVISOR.html" title='sunrise_kernel::devices::pit::CHAN_0_DIVISOR constant'>CHAN_0_DIVISOR</a></td><td class='docblock-short'><p>The channel 0 reset value</p>
+</td></tr><tr class='module-item'><td><a class="constant" href="constant.CHAN_0_FREQUENCY.html" title='sunrise_kernel::devices::pit::CHAN_0_FREQUENCY constant'>CHAN_0_FREQUENCY</a></td><td class='docblock-short'><p>The frequency of channel 0 irqs, in hertz.
+One every 10 millisecond.</p>
+</td></tr><tr class='module-item'><td><a class="constant" href="constant.OSCILLATOR_FREQ.html" title='sunrise_kernel::devices::pit::OSCILLATOR_FREQ constant'>OSCILLATOR_FREQ</a></td><td class='docblock-short'><p>The oscillator frequency when not divided, in hertz.</p>
+</td></tr></table><h2 id='functions' class='section-header'><a href="#functions">Functions</a></h2>
+<table><tr class='module-item'><td><a class="fn" href="fn.disable.html" title='sunrise_kernel::devices::pit::disable fn'>disable</a><a title='unsafe function' href='#'><sup>⚠</sup></a></td><td class='docblock-short'><p>Prevent the PIT from generating interrupts.</p>
+</td></tr><tr class='module-item'><td><a class="fn" href="fn.init_channel_0.html" title='sunrise_kernel::devices::pit::init_channel_0 fn'>init_channel_0</a><a title='unsafe function' href='#'><sup>⚠</sup></a></td><td class='docblock-short'><p>Initialize the channel 0 to send recurring irqs.</p>
+</td></tr><tr class='module-item'><td><a class="fn" href="fn.spin_wait_ms.html" title='sunrise_kernel::devices::pit::spin_wait_ms fn'>spin_wait_ms</a></td><td class='docblock-short'><p>Spin waits for at least <code>ms</code> amount of milliseconds</p>
+</td></tr></table></section><section id="search" class="content hidden"></section><section class="footer"></section><script>window.rootPath = "../../../";window.currentCrate = "sunrise_kernel";</script><script src="../../../main.js"></script><script defer src="../../../search-index.js"></script></body></html>

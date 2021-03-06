@@ -1,0 +1,24 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="API documentation for the Rust `updating_rust_version` mod in crate `docs`."><meta name="keywords" content="rust, rustlang, rust-lang, updating_rust_version"><title>docs::updating_rust_version - Rust</title><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../dark.css"><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script src="../../storage.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="shortcut icon" href="../../favicon.ico"><style type="text/css">#crate-search{background-image:url("../../down-arrow.svg");}</style></head><body class="rustdoc mod"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu">&#9776;</div><a href='../../docs/index.html'><div class='logo-container'><img src='../../rust-logo.png' alt='logo'></div></a><p class='location'>Module updating_rust_version</p><div class="sidebar-elems"><p class='location'><a href='../index.html'>docs</a></p><script>window.sidebarCurrent = {name: 'updating_rust_version', ty: 'mod', relpath: '../'};</script><script defer src="../sidebar-items.js"></script></div></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!"><img src="../../brush.svg" width="18" alt="Pick another theme!"></button><div id="theme-choices"></div></div><script src="../../theme.js"></script><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><a id="settings-menu" href="../../settings.html"><img src="../../wheel.svg" width="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><h1 class='fqn'><span class='out-of-band'><span id='render-detail'><a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class='inner'>&#x2212;</span>]</a></span><a class='srclink' href='../../src/docs/main.rs.html#11-13' title='goto source code'>[src]</a></span><span class='in-band'>Module <a href='../index.html'>docs</a>::<wbr><a class="mod" href=''>updating_rust_version</a></span></h1><div class='docblock'><h1 id="updating-the-rust-toolchain" class="section-header"><a href="#updating-the-rust-toolchain">Updating the Rust Toolchain</a></h1>
+<p>SunriseOS builds with a specific version of the Rust Nightly compiler specified by the rust-toolchain file. If the Rust compiler was installed via <code>rustup</code>, <code>cargo</code> will automatically check this file and install the required version of the rust compiler, ensuring the user always builds SunriseOS with the right toolchain.</p>
+<p>We will occasionally want to update the version of the Rust Compiler we use in order to make use of the latest language features or to get the latest bug fixes. To do so:</p>
+<ol>
+<li>Go to <a href="https://rust-lang.github.io/rustup-components-history/">rustup component history</a> and find the newest version that have the following components set as &quot;present&quot; on all Tier 1 Targets:
+<ul>
+<li>cargo</li>
+<li>clippy</li>
+<li>rls</li>
+<li>rust</li>
+<li>rust-analysis</li>
+<li>rust-docs</li>
+<li>rust-src</li>
+<li>rust-std</li>
+<li>rustc</li>
+</ul>
+</li>
+<li>Set the <code>rust-toolchain</code> file at the root of the repo to <code>nightly-$LATEST_VER</code>. For instance, if the latest version to support all the requirements is 2019-07-15, then set the rust-toolchain file to <code>nightly-2019-07-15</code>.</li>
+<li>Update <code>xargo</code> to the latest version. It likely contains fixes for latest rust changes (there are breaking changes to <code>no_std</code> builds from time to time).</li>
+<li>Compile the whole project, and fix all the errors.</li>
+<li>Update the <code>BUILDING.md</code> with the new minimum versions.</li>
+</ol>
+<p>Note that sometimes, none of the versions visible on the website will have the required component. In such a case, you'll have to wait until upstream fixes the builds, or find an old build manually. Good luck.</p>
+</div></section><section id="search" class="content hidden"></section><section class="footer"></section><script>window.rootPath = "../../";window.currentCrate = "docs";</script><script src="../../main.js"></script><script defer src="../../search-index.js"></script></body></html>

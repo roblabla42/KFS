@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["FileInterface","A libfat file interface implementing `FileOperations`."]]});

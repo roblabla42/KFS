@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["Disk","An AHCI Disk"],["IDisk","Interface to a disk."]]});

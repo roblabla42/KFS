@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["IBufferProxy","IPC Window object"],["ViInterfaceProxy","Entry point interface."]],"trait":[["IBuffer","IPC Window object"],["IBufferAsync","IPC Window object"],["ViInterface","Entry point interface."],["ViInterfaceAsync","Entry point interface."]]});

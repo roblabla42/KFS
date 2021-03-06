@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["cli","Disable interrupts"],["sti","Enable interrupts"]]});

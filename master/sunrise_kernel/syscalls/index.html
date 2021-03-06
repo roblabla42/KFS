@@ -1,0 +1,94 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="API documentation for the Rust `syscalls` mod in crate `sunrise_kernel`."><meta name="keywords" content="rust, rustlang, rust-lang, syscalls"><title>sunrise_kernel::syscalls - Rust</title><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../dark.css"><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script src="../../storage.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="shortcut icon" href="../../favicon.ico"><style type="text/css">#crate-search{background-image:url("../../down-arrow.svg");}</style></head><body class="rustdoc mod"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu">&#9776;</div><a href='../../sunrise_kernel/index.html'><div class='logo-container'><img src='../../rust-logo.png' alt='logo'></div></a><p class='location'>Module syscalls</p><div class="sidebar-elems"><div class="block items"><ul><li><a href="#functions">Functions</a></li></ul></div><p class='location'><a href='../index.html'>sunrise_kernel</a></p><script>window.sidebarCurrent = {name: 'syscalls', ty: 'mod', relpath: '../'};</script><script defer src="../sidebar-items.js"></script></div></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!"><img src="../../brush.svg" width="18" alt="Pick another theme!"></button><div id="theme-choices"></div></div><script src="../../theme.js"></script><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><a id="settings-menu" href="../../settings.html"><img src="../../wheel.svg" width="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><h1 class='fqn'><span class='out-of-band'><span id='render-detail'><a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class='inner'>&#x2212;</span>]</a></span><a class='srclink' href='../../src/sunrise_kernel/syscalls.rs.html#1-1247' title='goto source code'>[src]</a></span><span class='in-band'>Module <a href='../index.html'>sunrise_kernel</a>::<wbr><a class="mod" href=''>syscalls</a></span></h1><div class='docblock'><p>Syscall implementations</p>
+<p><img src="https://raw.githubusercontent.com/sunriseos/SunriseOS/master/kernel/res/syscalls_doc.jpg" alt="i can has cheezburger" /></p>
+<p>The syscall handlers of Sunrise.</p>
+</div><h2 id='functions' class='section-header'><a href="#functions">Functions</a></h2>
+<table><tr class='module-item'><td><a class="fn" href="fn.accept_session.html" title='sunrise_kernel::syscalls::accept_session fn'>accept_session</a></td><td class='docblock-short'><p>Waits for an incoming connection on the given ServerPort handle, and create
+a new ServerSession for it.</p>
+</td></tr><tr class='module-item'><td><a class="fn" href="fn.clear_event.html" title='sunrise_kernel::syscalls::clear_event fn'>clear_event</a></td><td class='docblock-short'><p>Clear the &quot;signaled&quot; state of an event. After calling this on a signaled
+event, <a href="../../sunrise_kernel/syscalls/fn.wait_synchronization.html" title="wait_synchronization()">wait_synchronization()</a> on this handle will wait until
+<a href="../../sunrise_kernel/syscalls/fn.signal_event.html" title="signal_event()">signal_event()</a> is called once again.</p>
+</td></tr><tr class='module-item'><td><a class="fn" href="fn.close_handle.html" title='sunrise_kernel::syscalls::close_handle fn'>close_handle</a></td><td class='docblock-short'><p>Closed the passed handle.</p>
+</td></tr><tr class='module-item'><td><a class="fn" href="fn.connect_to_named_port.html" title='sunrise_kernel::syscalls::connect_to_named_port fn'>connect_to_named_port</a></td><td class='docblock-short'><p>Connects to the given named port. The name should be a 12-byte array
+containing a null-terminated string.</p>
+</td></tr><tr class='module-item'><td><a class="fn" href="fn.connect_to_port.html" title='sunrise_kernel::syscalls::connect_to_port fn'>connect_to_port</a></td><td class='docblock-short'><p>Connects to the given ClientPort.</p>
+</td></tr><tr class='module-item'><td><a class="fn" href="fn.create_event.html" title='sunrise_kernel::syscalls::create_event fn'>create_event</a></td><td class='docblock-short'><p>Create a <a href="../../sunrise_kernel/event/struct.WritableEvent.html">WritableEvent</a>/<a href="../../sunrise_kernel/event/struct.ReadableEvent.html">ReadableEvent</a> pair. Signals on the
+<a href="../../sunrise_kernel/event/struct.WritableEvent.html">WritableEvent</a> will cause threads waiting on the <a href="../../sunrise_kernel/event/struct.ReadableEvent.html">ReadableEvent</a> to wake
+up until the signal is cleared/reset.</p>
+</td></tr><tr class='module-item'><td><a class="fn" href="fn.create_interrupt_event.html" title='sunrise_kernel::syscalls::create_interrupt_event fn'>create_interrupt_event</a></td><td class='docblock-short'><p>Create an event handle for the given IRQ number. Waiting on this handle will
+wait until the IRQ is triggered. The flags argument configures the
+triggering. If it is false, the IRQ is active HIGH level sensitive, if it is
+true it is rising-edge sensitive.</p>
+</td></tr><tr class='module-item'><td><a class="fn" href="fn.create_port.html" title='sunrise_kernel::syscalls::create_port fn'>create_port</a></td><td class='docblock-short'><p>Create a new Port pair. Those ports are linked to each-other: The server will
+receive connections from the client.</p>
+</td></tr><tr class='module-item'><td><a class="fn" href="fn.create_process.html" title='sunrise_kernel::syscalls::create_process fn'>create_process</a></td><td class='docblock-short'><p>Creates a new process. This will create an empty address space without any
+thread yet. The size of this address space is controlled through
+the <a href="../../sunrise_libkern/process/enum.ProcInfoAddrSpace.html" title="ProcInfoAddrSpace">ProcInfoAddrSpace</a> found in <code>procinfo</code>.</p>
+</td></tr><tr class='module-item'><td><a class="fn" href="fn.create_session.html" title='sunrise_kernel::syscalls::create_session fn'>create_session</a></td><td class='docblock-short'><p>Create a new Session pair. Those sessions are linked to each-other: The
+server will receive requests sent through the client.</p>
+</td></tr><tr class='module-item'><td><a class="fn" href="fn.create_shared_memory.html" title='sunrise_kernel::syscalls::create_shared_memory fn'>create_shared_memory</a></td><td class='docblock-short'><p>Allocate a new SharedMemory region. This is a memory region backed by
+DRAM allocated from the current process' pool partition, that can be mapped
+in different processes.</p>
+</td></tr><tr class='module-item'><td><a class="fn" href="fn.create_thread.html" title='sunrise_kernel::syscalls::create_thread fn'>create_thread</a></td><td class='docblock-short'><p>Creates a thread in the current process.
+The thread can then be started with the svcStartThread.</p>
+</td></tr><tr class='module-item'><td><a class="fn" href="fn.exit_process.html" title='sunrise_kernel::syscalls::exit_process fn'>exit_process</a></td><td class='docblock-short'><p>Kills our own process.</p>
+</td></tr><tr class='module-item'><td><a class="fn" href="fn.exit_thread.html" title='sunrise_kernel::syscalls::exit_thread fn'>exit_thread</a></td><td class='docblock-short'><p>Kills our own thread.</p>
+</td></tr><tr class='module-item'><td><a class="fn" href="fn.get_process_id.html" title='sunrise_kernel::syscalls::get_process_id fn'>get_process_id</a></td><td class='docblock-short'><p>Gets the PID of the given Process handle. Alias handles (0xFFFF8000 and
+0xFFFF8001) are not allowed here. PIDs are global, unique identifiers for a
+given process. PIDs are never reused, and can be passed over IPC safely (the
+kernel ensures the correct pid is passed when a process does a request),
+making them the best way for sysmodule to identify a calling process.</p>
+</td></tr><tr class='module-item'><td><a class="fn" href="fn.get_process_info.html" title='sunrise_kernel::syscalls::get_process_info fn'>get_process_info</a></td><td class='docblock-short'><p>Extract information from a process.</p>
+</td></tr><tr class='module-item'><td><a class="fn" href="fn.get_process_list.html" title='sunrise_kernel::syscalls::get_process_list fn'>get_process_list</a></td><td class='docblock-short'><p>Fills the provided array with the pids of currently living processes. A
+process &quot;lives&quot; so long as it is currently running or a handle to it still
+exists.</p>
+</td></tr><tr class='module-item'><td><a class="fn" href="fn.manage_named_port.html" title='sunrise_kernel::syscalls::manage_named_port fn'>manage_named_port</a></td><td class='docblock-short'><p>Creates a new ServerPort for the given named port. The name should be a
+12-byte array containing a null-terminated string. This ServerPort can be
+connected to with <code>connect_to_named_port</code>.</p>
+</td></tr><tr class='module-item'><td><a class="fn" href="fn.map_framebuffer.html" title='sunrise_kernel::syscalls::map_framebuffer fn'>map_framebuffer</a></td><td class='docblock-short'><p>Maps the vga frame buffer mmio in userspace memory</p>
+</td></tr><tr class='module-item'><td><a class="fn" href="fn.map_mmio_region.html" title='sunrise_kernel::syscalls::map_mmio_region fn'>map_mmio_region</a></td><td class='docblock-short'><p>Maps a physical region in the address space of the process.</p>
+</td></tr><tr class='module-item'><td><a class="fn" href="fn.map_process_memory.html" title='sunrise_kernel::syscalls::map_process_memory fn'>map_process_memory</a></td><td class='docblock-short'><p>Maps the given src memory range from a remote process into the current
+process as RW-. This is used by the Loader to load binaries into the memory
+region allocated by the kernel in <a href="../../sunrise_kernel/syscalls/fn.create_process.html" title="create_process()">create_process()</a>.</p>
+</td></tr><tr class='module-item'><td><a class="fn" href="fn.map_shared_memory.html" title='sunrise_kernel::syscalls::map_shared_memory fn'>map_shared_memory</a></td><td class='docblock-short'><p>Maps the block supplied by the handle. The required permissions are different
+for the process that created the handle and all other processes.</p>
+</td></tr><tr class='module-item'><td><a class="fn" href="fn.output_debug_string.html" title='sunrise_kernel::syscalls::output_debug_string fn'>output_debug_string</a></td><td class='docblock-short'><p>Print the passed string to the serial port.</p>
+</td></tr><tr class='module-item'><td><a class="fn" href="fn.query_memory.html" title='sunrise_kernel::syscalls::query_memory fn'>query_memory</a></td><td class='docblock-short'><p>Query information about an address. Will always fetch the lowest page-aligned
+mapping that contains the provided address. Writes the output to the
+given userspace pointer to a MemoryInfo structure.</p>
+</td></tr><tr class='module-item'><td><a class="fn" href="fn.query_physical_address.html" title='sunrise_kernel::syscalls::query_physical_address fn'>query_physical_address</a></td><td class='docblock-short'><p>Gets the physical region a given virtual address maps.</p>
+</td></tr><tr class='module-item'><td><a class="fn" href="fn.reply_and_receive_with_user_buffer.html" title='sunrise_kernel::syscalls::reply_and_receive_with_user_buffer fn'>reply_and_receive_with_user_buffer</a></td><td class='docblock-short'><p>If ReplyTarget is not zero, a reply from the given buffer will be sent to
+that session. Then it will wait until either of the passed sessions has an
+incoming message, is closed, a passed port has an incoming connection, or
+the timeout expires. If there is an incoming message, it is copied to the
+TLS.</p>
+</td></tr><tr class='module-item'><td><a class="fn" href="fn.reset_signal.html" title='sunrise_kernel::syscalls::reset_signal fn'>reset_signal</a></td><td class='docblock-short'><p>Clear the &quot;signaled&quot; state of a readable event or process. After calling
+this on a signaled event, <a href="../../sunrise_kernel/syscalls/fn.wait_synchronization.html" title="wait_synchronization()">wait_synchronization()</a> on this handle will wait
+until the handle is signaled again.</p>
+</td></tr><tr class='module-item'><td><a class="fn" href="fn.send_sync_request_with_user_buffer.html" title='sunrise_kernel::syscalls::send_sync_request_with_user_buffer fn'>send_sync_request_with_user_buffer</a></td><td class='docblock-short'><p>Send an IPC request through the ClientSession, and blocks until a response is
+received. This variant takes a userspace buffer and size. Those must be
+page-aligned.</p>
+</td></tr><tr class='module-item'><td><a class="fn" href="fn.set_heap_size.html" title='sunrise_kernel::syscalls::set_heap_size fn'>set_heap_size</a></td><td class='docblock-short'><p>Resize the heap of a process, just like a brk.
+It can both expand, and shrink the heap.</p>
+</td></tr><tr class='module-item'><td><a class="fn" href="fn.set_process_memory_permission.html" title='sunrise_kernel::syscalls::set_process_memory_permission fn'>set_process_memory_permission</a></td><td class='docblock-short'><p>Change permission of a page-aligned memory region. Acceptable permissions
+are ---, r-- and rw-. In other words, it is not allowed to set the
+executable bit, nor is it acceptable to use write-only permissions.</p>
+</td></tr><tr class='module-item'><td><a class="fn" href="fn.set_thread_area.html" title='sunrise_kernel::syscalls::set_thread_area fn'>set_thread_area</a></td><td class='docblock-short'><p>Set thread local area pointer.</p>
+</td></tr><tr class='module-item'><td><a class="fn" href="fn.signal_event.html" title='sunrise_kernel::syscalls::signal_event fn'>signal_event</a></td><td class='docblock-short'><p>Sets the &quot;signaled&quot; state of an event. Calling this on an unsignalled event
+will cause any thread waiting on this event through <a href="../../sunrise_kernel/syscalls/fn.wait_synchronization.html" title="wait_synchronization()">wait_synchronization()</a>
+to wake up. Any future calls to <a href="../../sunrise_kernel/syscalls/fn.wait_synchronization.html" title="wait_synchronization()">wait_synchronization()</a> with this handle
+will immediately return - the user has to clear the &quot;signaled&quot; state through
+<a href="../../sunrise_kernel/syscalls/fn.clear_event.html" title="clear_event()">clear_event()</a>.</p>
+</td></tr><tr class='module-item'><td><a class="fn" href="fn.sleep_thread.html" title='sunrise_kernel::syscalls::sleep_thread fn'>sleep_thread</a></td><td class='docblock-short'><p>Sleep for a specified amount of time, or yield thread.</p>
+</td></tr><tr class='module-item'><td><a class="fn" href="fn.start_process.html" title='sunrise_kernel::syscalls::start_process fn'>start_process</a></td><td class='docblock-short'><p>Start the given process on the provided CPU with the provided scheduler
+priority.</p>
+</td></tr><tr class='module-item'><td><a class="fn" href="fn.start_thread.html" title='sunrise_kernel::syscalls::start_thread fn'>start_thread</a></td><td class='docblock-short'><p>Starts a previously created thread.</p>
+</td></tr><tr class='module-item'><td><a class="fn" href="fn.terminate_process.html" title='sunrise_kernel::syscalls::terminate_process fn'>terminate_process</a></td><td class='docblock-short'><p>Kills the given process, terminating the execution of all of its thread and
+putting its state to Exiting/Exited.</p>
+</td></tr><tr class='module-item'><td><a class="fn" href="fn.unmap_process_memory.html" title='sunrise_kernel::syscalls::unmap_process_memory fn'>unmap_process_memory</a></td><td class='docblock-short'><p>Unmaps a memory range mapped with <a href="../../sunrise_kernel/syscalls/fn.map_process_memory.html" title="map_process_memory()">map_process_memory()</a>. <code>dst_addr</code> is an
+address in the current address space, while <code>src_addr</code> is the address in the
+remote address space that was previously mapped.</p>
+</td></tr><tr class='module-item'><td><a class="fn" href="fn.unmap_shared_memory.html" title='sunrise_kernel::syscalls::unmap_shared_memory fn'>unmap_shared_memory</a></td><td class='docblock-short'><p>Unmaps this shared memory region. This cannot be used to partially unmap a
+region: the address <strong>must</strong> be the start of the shared mapping, and the size
+<strong>must</strong> be the full size of the mapping.</p>
+</td></tr><tr class='module-item'><td><a class="fn" href="fn.wait_synchronization.html" title='sunrise_kernel::syscalls::wait_synchronization fn'>wait_synchronization</a></td><td class='docblock-short'><p>Waits for one of the handles to signal an event.</p>
+</td></tr></table></section><section id="search" class="content hidden"></section><section class="footer"></section><script>window.rootPath = "../../";window.currentCrate = "sunrise_kernel";</script><script src="../../main.js"></script><script defer src="../../search-index.js"></script></body></html>

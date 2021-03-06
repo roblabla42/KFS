@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["PhysicalAddress","Represents a Physical address"],["VirtualAddress","Represents a Virtual address"]]});
