@@ -196,7 +196,7 @@ pub fn init_cpu_locals(cpu_count: usize) {
     });
 
     // yes, they are 😌
-    ARE_CPU_LOCALS_INITIALIZED_YET.store(true, Ordering::Relaxed);
+    ARE_CPU_LOCALS_INITIALIZED_YET.store(true, Ordering::SeqCst);
 }
 
 /// The `round` function, as defined in section 3.0:

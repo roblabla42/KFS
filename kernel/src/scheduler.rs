@@ -36,7 +36,7 @@ static CURRENT_THREAD: RefCell<Option<Arc<ThreadStruct>>> = RefCell::new(None);
 pub fn try_get_current_thread() -> Option<Arc<ThreadStruct>> {
     // if cpu_locals haven't been initialized, accessing gs:0 will triple fault,
     // so don't even remotely try to access it.
-    if !ARE_CPU_LOCALS_INITIALIZED_YET.load(Ordering::Relaxed) {
+    if !ARE_CPU_LOCALS_INITIALIZED_YET.load(Ordering::SeqCst) {
         None
     } else {
         CURRENT_THREAD.borrow().clone()
