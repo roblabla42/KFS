@@ -17,4 +17,4 @@ default-features = false
 version = "1.3.2"
 
 [dev-dependencies]
-futures-preview = { version = "0.3.0-alpha.16", default-features = false, features = ["nightly"] }
+futures-preview = { version = "0.3.0-alpha.18", default-features = false, features = ["nightly"] }
