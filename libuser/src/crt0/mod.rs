@@ -5,7 +5,7 @@
 pub mod relocation;
 
 /// Executable entrypoint. Handle relocations and calls real_start.
-#[cfg(target_os = "sunrise")]
+#[cfg(all(target_os = "sunrise", target_arch = "x86"))]
 #[naked]
 #[no_mangle]
 #[link_section = ".text.crt0"]

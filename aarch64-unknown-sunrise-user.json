@@ -1,0 +1,29 @@
+{
+  "abi-blacklist": [
+    "stdcall",
+    "fastcall",
+    "vectorcall",
+    "thiscall",
+    "win64",
+    "sysv64"
+  ],
+  "arch": "aarch64",
+  "data-layout": "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128",
+  "dynamic-linking": false,
+  "env": "user",
+  "executables": true,
+  "has-elf-tls": true,
+  "has-rpath": false,
+  "linker-flavor": "ld.lld",
+  "linker-is-gnu": true,
+  "llvm-target": "aarch64-unknown-none",
+  "max-atomic-width": 128,
+  "os": "sunrise",
+  "panic-strategy": "abort",
+  "position-independent-executables": true,
+  "target-c-int-width": "32",
+  "target-endian": "little",
+  "target-mcount": "\u0001_mcount",
+  "target-pointer-width": "64",
+  "tls-model": "initial-exec"
+}

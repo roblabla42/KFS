@@ -83,25 +83,74 @@ extern {
     fn syscall_inner(registers: &mut Registers);
 }
 
+// unsafe fn syscall(nr: usize, arg1: usize, arg2: usize, arg3: usize, arg4: usize, arg5: usize, arg6: usize) -> Result<(usize, usize, usize, usize), KernelError> {
 /// Generic syscall function.
-unsafe fn syscall(nr: usize, arg1: usize, arg2: usize, arg3: usize, arg4: usize, arg5: usize, arg6: usize) -> Result<(usize, usize, usize, usize), KernelError> {
-    let mut registers = Registers {
-        eax: nr,
-        ebx: arg1,
-        ecx: arg2,
-        edx: arg3,
-        esi: arg4,
-        edi: arg5,
-        ebp: arg6
-    };
+#[cfg(not(target_arch = "aarch64"))]
+macro_rules! syscall {
+    ($nr:expr, $arg1:expr, $arg2:expr, $arg3:expr, $arg4:expr, $arg5:expr, $arg6:expr) => {{
+        let nr: usize = $nr;
+        let arg1: usize = $arg1;
+        let arg2: usize = $arg2;
+        let arg3: usize = $arg3;
+        let arg4: usize = $arg4;
+        let arg5: usize = $arg5;
+        let arg6: usize = $arg6;
 
-    syscall_inner(&mut registers);
+        let mut registers = Registers {
+            eax: nr,
+            ebx: arg1,
+            ecx: arg2,
+            edx: arg3,
+            esi: arg4,
+            edi: arg5,
+            ebp: arg6
+        };
 
-    if registers.eax == 0 {
-        Ok((registers.ebx, registers.ecx, registers.edx, registers.esi))
-    } else {
-        Err(KernelError::from_syscall_ret(registers.eax as u32))
-    }
+        syscall_inner(&mut registers);
+
+        if registers.eax == 0 {
+            Ok((registers.ebx, registers.ecx, registers.edx, registers.esi))
+        } else {
+            Err(KernelError::from_syscall_ret(registers.eax as u32))
+        }
+    }};
+}
+
+/// Generic syscall function.
+#[cfg(target_arch = "aarch64")]
+macro_rules! syscall {
+    ($nr:expr, $arg1:expr, $arg2:expr, $arg3:expr, $arg4:expr, $arg5:expr, $arg6:expr) => {{
+        let mut arg0: usize = $arg1;
+        let mut arg1: usize = $arg2;
+        let mut arg2: usize = $arg3;
+        let mut arg3: usize = $arg4;
+        let mut arg4: usize = $arg5;
+        let arg5: usize = $arg6;
+
+        asm!(
+            "svc $5"
+            : "={x0}"(arg0),
+            "={x1}"(arg1),
+            "={x2}"(arg2),
+            "={x3}"(arg3),
+            "={x4}"(arg4)
+            : "i"($nr),
+            "{x0}"(arg0),
+            "{x1}"(arg1),
+            "{x2}"(arg2),
+            "{x3}"(arg3),
+            "{x4}"(arg4),
+            "{x5}"(arg5)
+            : "memory", "x5", "x6"
+            : "volatile"
+            );
+
+        if arg0 == 0 {
+            Ok((arg1, arg2, arg3, arg4))
+        } else {
+            Err(KernelError::from_syscall_ret(arg0 as u32))
+        }
+    }};
 }
 
 /// Resize the heap of a process, just like a brk.
@@ -122,7 +171,7 @@ unsafe fn syscall(nr: usize, arg1: usize, arg2: usize, arg3: usize, arg4: usize,
 /// This function can free memory, potentially invalidating references to structs that were in it.
 pub unsafe fn set_heap_size(new_size: usize) -> Result<usize, KernelError> {
     let (heap_address_base, ..) = unsafe {
-        syscall(nr::SetHeapSize, new_size, 0, 0, 0, 0, 0)?
+        syscall!(nr::SetHeapSize, new_size, 0, 0, 0, 0, 0)?
     };
     Ok(heap_address_base)
 }
@@ -136,7 +185,7 @@ pub unsafe fn set_heap_size(new_size: usize) -> Result<usize, KernelError> {
 pub fn query_memory(addr: usize) -> Result<(MemoryInfo, usize), KernelError> {
     let mut meminfo = MemoryInfo::default();
     let (pageinfo, ..) = unsafe {
-        syscall(nr::QueryMemory, &mut meminfo as *mut _ as usize, 0, addr, 0, 0, 0)?
+        syscall!(nr::QueryMemory, &mut meminfo as *mut _ as usize, 0, addr, 0, 0, 0)?
     };
     Ok((meminfo, pageinfo))
 }
@@ -144,7 +193,7 @@ pub fn query_memory(addr: usize) -> Result<(MemoryInfo, usize), KernelError> {
 /// Exits the process, killing all threads.
 pub fn exit_process() -> ! {
     unsafe {
-        match syscall(nr::ExitProcess, 0, 0, 0, 0, 0, 0) {
+        match syscall!(nr::ExitProcess, 0, 0, 0, 0, 0, 0) {
             Ok(_) => (),
             Err(err) => { let _ = output_debug_string(&format!("Failed to exit: {}", err), 10, "sunrise_libuser::syscalls::exit_process"); },
         }
@@ -158,9 +207,23 @@ pub fn exit_process() -> ! {
 /// # Safety
 ///
 /// `sp` must a valid pointer to a stack that is uniquely owned, as the thread will write to it.
+#[cfg(target_arch = "x86")]
 pub unsafe fn create_thread(ip: extern "fastcall" fn(usize) -> !, arg: usize, sp: *const u8, priority: u32, processor_id: u32) -> Result<Thread, KernelError> {
     unsafe {
-        let (out_handle, ..) = syscall(nr::CreateThread, ip as usize, arg, sp as _, priority as _, processor_id as _, 0)?;
+        let (out_handle, ..) = syscall!(nr::CreateThread, ip as usize, arg, sp as _, priority as _, processor_id as _, 0)?;
+        Ok(Thread(Handle::new(out_handle as _)))
+    }
+}
+
+/// Creates a thread in the current process.
+///
+/// # Unsafety
+///
+/// `sp` must a valid pointer to a stack that is uniquely owned, as the thread will write to it.
+#[cfg(not(target_arch = "x86"))]
+pub unsafe fn create_thread(ip: extern fn(usize) -> !, arg: usize, sp: *const u8, priority: u32, processor_id: u32) -> Result<Thread, KernelError> {
+    unsafe {
+        let (out_handle, ..) = syscall!(nr::CreateThread, ip as usize, arg, sp as _, priority as _, processor_id as _, 0)?;
         Ok(Thread(Handle::new(out_handle as _)))
     }
 }
@@ -168,7 +231,7 @@ pub unsafe fn create_thread(ip: extern "fastcall" fn(usize) -> !, arg: usize, sp
 /// Starts the thread for the provided handle.
 pub fn start_thread(thread_handle: &Thread) -> Result<(), KernelError> {
     unsafe {
-        syscall(nr::StartThread, (thread_handle.0).0.get() as usize, 0, 0, 0, 0, 0)?;
+        syscall!(nr::StartThread, (thread_handle.0).0.get() as usize, 0, 0, 0, 0, 0)?;
         Ok(())
     }
 }
@@ -177,7 +240,7 @@ pub fn start_thread(thread_handle: &Thread) -> Result<(), KernelError> {
 #[allow(unused_must_use)]
 pub fn exit_thread() -> ! {
     unsafe {
-        syscall(nr::ExitThread, 0, 0, 0, 0, 0, 0);
+        syscall!(nr::ExitThread, 0, 0, 0, 0, 0, 0);
     }
     unreachable!("svcExitThread returned, WTF ???")
 }
@@ -185,7 +248,7 @@ pub fn exit_thread() -> ! {
 /// Sleeps for a specified amount of time, or yield thread.
 pub fn sleep_thread(nanos: usize) -> Result<(), KernelError> {
     unsafe {
-        syscall(nr::SleepThread, nanos, 0, 0, 0, 0, 0)?;
+        syscall!(nr::SleepThread, nanos, 0, 0, 0, 0, 0)?;
         Ok(())
     }
 }
@@ -199,7 +262,7 @@ pub fn sleep_thread(nanos: usize) -> Result<(), KernelError> {
 /// Takes either a [ReadableEvent] or a [WritableEvent].
 pub fn signal_event(event: &WritableEvent) -> Result<(), KernelError> {
     unsafe {
-        syscall(nr::SignalEvent, (event.0).0.get() as _, 0, 0, 0, 0, 0)?;
+        syscall!(nr::SignalEvent, (event.0).0.get() as _, 0, 0, 0, 0, 0)?;
         Ok(())
     }
 }
@@ -216,7 +279,7 @@ pub fn signal_event(event: &WritableEvent) -> Result<(), KernelError> {
 ///   - The event wasn't signaled.
 pub(crate) fn clear_event(event: HandleRef) -> Result<(), KernelError> {
     unsafe {
-        syscall(nr::ClearEvent, event.inner.get() as _, 0, 0, 0, 0, 0)?;
+        syscall!(nr::ClearEvent, event.inner.get() as _, 0, 0, 0, 0, 0)?;
         Ok(())
     }
 }
@@ -233,7 +296,7 @@ pub(crate) fn clear_event(event: HandleRef) -> Result<(), KernelError> {
 /// - Errors if size is not page-aligned.
 pub fn create_shared_memory(size: usize, myperm: MemoryPermissions, otherperm: MemoryPermissions) -> Result<SharedMemory, KernelError> {
     unsafe {
-        let (out_handle, ..) = syscall(nr::CreateSharedMemory, size, myperm.bits() as _, otherperm.bits() as _, 0, 0, 0)?;
+        let (out_handle, ..) = syscall!(nr::CreateSharedMemory, size, myperm.bits() as _, otherperm.bits() as _, 0, 0, 0)?;
         Ok(SharedMemory(Handle::new(out_handle as _)))
     }
 }
@@ -249,7 +312,7 @@ pub fn create_shared_memory(size: usize, myperm: MemoryPermissions, otherperm: M
 /// - perm must be allowed.
 pub fn map_shared_memory(handle: &SharedMemory, addr: usize, size: usize, perm: MemoryPermissions) -> Result<(), KernelError> {
     unsafe {
-        syscall(nr::MapSharedMemory, (handle.0).0.get() as _, addr, size, perm.bits() as _, 0, 0)?;
+        syscall!(nr::MapSharedMemory, (handle.0).0.get() as _, addr, size, perm.bits() as _, 0, 0)?;
         Ok(())
     }
 }
@@ -269,7 +332,7 @@ pub fn map_shared_memory(handle: &SharedMemory, addr: usize, size: usize, perm: 
 /// - addr must point to a mapping backed by the given handle
 /// - Size must be equal to the size of the backing shared memory handle.
 pub unsafe fn unmap_shared_memory(handle: &SharedMemory, addr: usize, size: usize) -> Result<(), KernelError> {
-    syscall(nr::UnmapSharedMemory, (handle.0).0.get() as _, addr, size, 0, 0, 0)?;
+    syscall!(nr::UnmapSharedMemory, (handle.0).0.get() as _, addr, size, 0, 0, 0)?;
     Ok(())
 }
 
@@ -277,7 +340,7 @@ pub unsafe fn unmap_shared_memory(handle: &SharedMemory, addr: usize, size: usiz
 /// Close the given handle.
 pub(crate) fn close_handle(handle: u32) -> Result<(), KernelError> {
     unsafe {
-        syscall(nr::CloseHandle, handle as _, 0, 0, 0, 0, 0)?;
+        syscall!(nr::CloseHandle, handle as _, 0, 0, 0, 0, 0)?;
         Ok(())
     }
 }
@@ -328,7 +391,7 @@ pub(crate) fn close_handle(handle: u32) -> Result<(), KernelError> {
 ///   to wait on more than 0x40 handles.
 pub fn wait_synchronization(handles: &[HandleRef<'_>], timeout_ns: Option<usize>) -> Result<usize, KernelError> {
     unsafe {
-        let (handleidx, ..) = syscall(nr::WaitSynchronization, handles.as_ptr() as _, handles.len(), timeout_ns.unwrap_or_else(usize::max_value), 0, 0, 0)?;
+        let (handleidx, ..) = syscall!(nr::WaitSynchronization, handles.as_ptr() as _, handles.len(), timeout_ns.unwrap_or_else(usize::max_value), 0, 0, 0)?;
         Ok(handleidx)
     }
 }
@@ -336,7 +399,7 @@ pub fn wait_synchronization(handles: &[HandleRef<'_>], timeout_ns: Option<usize>
 /// Creates a session to the given named port.
 pub fn connect_to_named_port(s: &str) -> Result<ClientSession, KernelError> {
     unsafe {
-        let (out_handle, ..) = syscall(nr::ConnectToNamedPort, s.as_ptr() as _, 0, 0, 0, 0, 0)?;
+        let (out_handle, ..) = syscall!(nr::ConnectToNamedPort, s.as_ptr() as _, 0, 0, 0, 0, 0)?;
         Ok(ClientSession(Handle::new(out_handle as _)))
     }
 }
@@ -346,7 +409,7 @@ pub fn connect_to_named_port(s: &str) -> Result<ClientSession, KernelError> {
 /// Please see the IPC module for more information on IPC.
 pub fn send_sync_request_with_user_buffer(buf: &mut [u8], handle: &ClientSession) -> Result<(), KernelError> {
     unsafe {
-        syscall(nr::SendSyncRequestWithUserBuffer, buf.as_ptr() as _, buf.len(), (handle.0).0.get() as _, 0, 0, 0)?;
+        syscall!(nr::SendSyncRequestWithUserBuffer, buf.as_ptr() as _, buf.len(), (handle.0).0.get() as _, 0, 0, 0)?;
         Ok(())
     }
 }
@@ -356,7 +419,7 @@ pub fn send_sync_request_with_user_buffer(buf: &mut [u8], handle: &ClientSession
 /// Currently, this prints the string to the serial port.
 pub fn output_debug_string(s: &str, level: usize, target: &str) -> Result<(), KernelError> {
     unsafe {
-        syscall(nr::OutputDebugString, s.as_ptr() as _, s.len(), level, target.as_ptr() as _, target.len(), 0)?;
+        syscall!(nr::OutputDebugString, s.as_ptr() as _, s.len(), level, target.as_ptr() as _, target.len(), 0)?;
         Ok(())
     }
 }
@@ -364,7 +427,7 @@ pub fn output_debug_string(s: &str, level: usize, target: &str) -> Result<(), Ke
 /// Create an anonymous session.
 pub fn create_session(is_light: bool, unk: usize) -> Result<(ServerSession, ClientSession), KernelError> {
     unsafe {
-        let (serverhandle, clienthandle, ..) = syscall(nr::CreateSession, is_light as _, unk, 0, 0, 0, 0)?;
+        let (serverhandle, clienthandle, ..) = syscall!(nr::CreateSession, is_light as _, unk, 0, 0, 0, 0)?;
         Ok((ServerSession(Handle::new(serverhandle as _)), ClientSession(Handle::new(clienthandle as _))))
     }
 }
@@ -372,7 +435,7 @@ pub fn create_session(is_light: bool, unk: usize) -> Result<(ServerSession, Clie
 /// Accept a connection on the given port.
 pub fn accept_session(port: &ServerPort) -> Result<ServerSession, KernelError> {
     unsafe {
-        let (out_handle, ..) = syscall(nr::AcceptSession, (port.0).0.get() as _, 0, 0, 0, 0, 0)?;
+        let (out_handle, ..) = syscall!(nr::AcceptSession, (port.0).0.get() as _, 0, 0, 0, 0, 0)?;
         Ok(ServerSession(Handle::new(out_handle as _)))
     }
 }
@@ -398,7 +461,7 @@ pub fn accept_session(port: &ServerPort) -> Result<ServerSession, KernelError> {
 /// [switchbrew's IPC marshalling page]: https://http://switchbrew.org/index.php?title=IPC_Marshalling
 pub fn reply_and_receive_with_user_buffer(buf: &mut [u8], handles: &[HandleRef<'_>], replytarget: Option<HandleRef<'_>>, timeout: Option<usize>) -> Result<usize, KernelError> {
     unsafe {
-        let (idx, ..) = syscall(nr::ReplyAndReceiveWithUserBuffer, buf.as_ptr() as _, buf.len(), handles.as_ptr() as _, handles.len(), match replytarget {
+        let (idx, ..) = syscall!(nr::ReplyAndReceiveWithUserBuffer, buf.as_ptr() as _, buf.len(), handles.as_ptr() as _, handles.len(), match replytarget {
             Some(s) => s.inner.get() as _,
             None => 0
         }, timeout.unwrap_or_else(usize::max_value))?;
@@ -409,7 +472,7 @@ pub fn reply_and_receive_with_user_buffer(buf: &mut [u8], handles: &[HandleRef<'
 /// Create a [ReadableEvent]/[WritableEvent] pair.
 pub fn create_event() -> Result<(WritableEvent, ReadableEvent), KernelError> {
     unsafe {
-        let (wevent, revent, ..) = syscall(nr::CreateEvent, 0, 0, 0, 0, 0, 0)?;
+        let (wevent, revent, ..) = syscall!(nr::CreateEvent, 0, 0, 0, 0, 0, 0)?;
         Ok((WritableEvent(Handle::new(wevent as _)), ReadableEvent(Handle::new(revent as _))))
     }
 }
@@ -419,7 +482,7 @@ pub fn create_event() -> Result<(WritableEvent, ReadableEvent), KernelError> {
 /// Note that the process needs to be authorized to listen for the given IRQ.
 pub fn create_interrupt_event(irqnum: usize, flag: u32) -> Result<ReadableEvent, KernelError> {
     unsafe {
-        let (out_handle, ..) = syscall(nr::CreateInterruptEvent, irqnum, flag as usize, 0, 0, 0, 0)?;
+        let (out_handle, ..) = syscall!(nr::CreateInterruptEvent, irqnum, flag as usize, 0, 0, 0, 0)?;
         Ok(ReadableEvent(Handle::new(out_handle as _)))
     }
 }
@@ -440,7 +503,7 @@ pub fn create_interrupt_event(irqnum: usize, flag: u32) -> Result<ReadableEvent,
 /// - InvalidAddress: This address does not map physical memory.
 pub fn query_physical_address(virtual_address: usize) -> Result<(usize, usize, usize), KernelError> {
     unsafe {
-        let (phys_addr, base_addr, phys_len, ..) = syscall(nr::QueryPhysicalAddress, virtual_address, 0, 0, 0, 0, 0)?;
+        let (phys_addr, base_addr, phys_len, ..) = syscall!(nr::QueryPhysicalAddress, virtual_address, 0, 0, 0, 0, 0)?;
         Ok((phys_addr, base_addr, phys_len))
     }
 }
@@ -448,7 +511,7 @@ pub fn query_physical_address(virtual_address: usize) -> Result<(usize, usize, u
 /// Creates an anonymous port.
 pub fn create_port(max_sessions: u32, is_light: bool, name_ptr: &[u8]) -> Result<(ClientPort, ServerPort), KernelError> {
     unsafe {
-        let (out_client_handle, out_server_handle, ..) = syscall(nr::CreatePort, max_sessions as _, is_light as _, name_ptr.as_ptr() as _, 0, 0, 0)?;
+        let (out_client_handle, out_server_handle, ..) = syscall!(nr::CreatePort, max_sessions as _, is_light as _, name_ptr.as_ptr() as _, 0, 0, 0)?;
         Ok((ClientPort(Handle::new(out_client_handle as _)), ServerPort(Handle::new(out_server_handle as _))))
     }
 }
@@ -456,7 +519,7 @@ pub fn create_port(max_sessions: u32, is_light: bool, name_ptr: &[u8]) -> Result
 /// Creates a named port.
 pub fn manage_named_port(name: &str, max_handles: u32) -> Result<ServerPort, KernelError> {
     unsafe {
-        let (out_handle, ..) = syscall(nr::ManageNamedPort, name.as_ptr() as _, max_handles as _, 0, 0, 0, 0)?;
+        let (out_handle, ..) = syscall!(nr::ManageNamedPort, name.as_ptr() as _, max_handles as _, 0, 0, 0, 0)?;
         Ok(ServerPort(Handle::new(out_handle as _)))
     }
 }
@@ -464,7 +527,7 @@ pub fn manage_named_port(name: &str, max_handles: u32) -> Result<ServerPort, Ker
 /// Connects to the given named port.
 pub fn connect_to_port(port: &ClientPort) -> Result<ClientSession, KernelError> {
     unsafe {
-        let (out_handle, ..) = syscall(nr::ConnectToPort, (port.0).0.get() as _, 0, 0, 0, 0, 0)?;
+        let (out_handle, ..) = syscall!(nr::ConnectToPort, (port.0).0.get() as _, 0, 0, 0, 0, 0)?;
         Ok(ClientSession(Handle::new(out_handle as _)))
     }
 }
@@ -472,7 +535,7 @@ pub fn connect_to_port(port: &ClientPort) -> Result<ClientSession, KernelError> 
 /// Maps the framebuffer to a kernel-chosen address.
 pub fn map_framebuffer() -> Result<(&'static mut [u8], usize, usize, usize), KernelError> {
     unsafe {
-        let (addr, width, height, bpp) = syscall(nr::MapFramebuffer, 0, 0, 0, 0, 0, 0)?;
+        let (addr, width, height, bpp) = syscall!(nr::MapFramebuffer, 0, 0, 0, 0, 0, 0)?;
         let framebuffer_size = bpp * width * height / 8;
         Ok((slice::from_raw_parts_mut(addr as *mut u8, framebuffer_size), width, height, bpp))
     }
@@ -491,7 +554,7 @@ pub fn map_framebuffer() -> Result<(&'static mut [u8], usize, usize, usize), Ker
 ///     * `length` is zero.
 pub fn map_mmio_region(physical_address: usize, size: usize, virtual_address: usize, writable: bool) -> Result<(), KernelError> {
     unsafe {
-        syscall(nr::MapMmioRegion, physical_address, size, virtual_address, writable as usize, 0, 0)?;
+        syscall!(nr::MapMmioRegion, physical_address, size, virtual_address, writable as usize, 0, 0)?;
         Ok(())
     }
 }
@@ -530,7 +593,7 @@ pub fn map_mmio_region(physical_address: usize, size: usize, virtual_address: us
 /// * No returned error otherwise.
 pub unsafe fn set_thread_area(address: usize) -> Result<(), KernelError> {
     unsafe {
-        syscall(nr::SetThreadArea, address, 0, 0, 0, 0, 0)?;
+        syscall!(nr::SetThreadArea, address, 0, 0, 0, 0, 0)?;
         Ok(())
     }
 }
@@ -557,7 +620,7 @@ pub unsafe fn set_thread_area(address: usize) -> Result<(), KernelError> {
 /// [`process_permission_change_allowed`]: sunrise_libkern::MemoryState::PROCESS_PERMISSION_CHANGE_ALLOWED
 pub fn set_process_memory_permission(proc_hnd: &Process, addr: usize, size: usize, perms: MemoryPermissions) -> Result<(), KernelError> {
     unsafe {
-        syscall(nr::SetProcessMemoryPermission, (proc_hnd.0).0.get() as _, addr, size, perms.bits() as _, 0, 0)?;
+        syscall!(nr::SetProcessMemoryPermission, (proc_hnd.0).0.get() as _, addr, size, perms.bits() as _, 0, 0)?;
         Ok(())
     }
 }
@@ -589,7 +652,7 @@ pub fn set_process_memory_permission(proc_hnd: &Process, addr: usize, size: usiz
 ///      handle.
 pub fn map_process_memory(dstaddr: usize, proc_handle: &Process, srcaddr: usize, size: usize) -> Result<(), KernelError> {
     unsafe {
-        syscall(nr::MapProcessMemory, dstaddr, (proc_handle.0).0.get() as _, srcaddr, size, 0, 0)?;
+        syscall!(nr::MapProcessMemory, dstaddr, (proc_handle.0).0.get() as _, srcaddr, size, 0, 0)?;
         Ok(())
     }
 }
@@ -628,7 +691,7 @@ pub fn map_process_memory(dstaddr: usize, proc_handle: &Process, srcaddr: usize,
 ///    - The handle passed as an argument does not exist or is not a Process
 ///      handle.
 pub unsafe fn unmap_process_memory(dstaddr: usize, proc_handle: &Process, srcaddr: usize, size: usize) -> Result<(), KernelError> {
-    syscall(nr::UnmapProcessMemory, dstaddr, (proc_handle.0).0.get() as _, srcaddr, size, 0, 0)?;
+    syscall!(nr::UnmapProcessMemory, dstaddr, (proc_handle.0).0.get() as _, srcaddr, size, 0, 0)?;
     Ok(())
 }
 
@@ -638,7 +701,7 @@ pub unsafe fn unmap_process_memory(dstaddr: usize, proc_handle: &Process, srcadd
 /// ProcessMana's `LaunchTitle` function.
 pub fn create_process(procinfo: &ProcInfo, caps: &[u8]) -> Result<Process, KernelError> {
     unsafe {
-        let (hnd, ..) = syscall(nr::CreateProcess, procinfo as *const _ as usize, caps.as_ptr() as usize, caps.len() / 4, 0, 0, 0)?;
+        let (hnd, ..) = syscall!(nr::CreateProcess, procinfo as *const _ as usize, caps.as_ptr() as usize, caps.len() / 4, 0, 0, 0)?;
         Ok(Process(Handle::new(hnd as _)))
     }
 }
@@ -666,7 +729,7 @@ pub fn create_process(procinfo: &ProcInfo, caps: &[u8]) -> Result<Process, Kerne
 ///   - Provided stack size is bigger than available vmem space.
 pub fn start_process(process_handle: &Process, main_thread_prio: u32, default_cpuid: u32, main_thread_stacksz: u32) -> Result<(), KernelError> {
     unsafe {
-        syscall(nr::StartProcess, (process_handle.0).0.get() as usize, main_thread_prio as _, default_cpuid as _, main_thread_stacksz as _, 0, 0)?;
+        syscall!(nr::StartProcess, (process_handle.0).0.get() as usize, main_thread_prio as _, default_cpuid as _, main_thread_stacksz as _, 0, 0)?;
         Ok(())
     }
 }
@@ -686,7 +749,7 @@ pub fn start_process(process_handle: &Process, main_thread_prio: u32, default_cp
 ///   - The passed info_type is unknown.
 pub fn get_process_info(process_handle: &Process, ty: ProcessInfoType) -> Result<u32, KernelError> {
     unsafe {
-        let (info, ..) = syscall(nr::GetProcessInfo, (process_handle.0).0.get() as usize, ty.0 as usize, 0, 0, 0, 0)?;
+        let (info, ..) = syscall!(nr::GetProcessInfo, (process_handle.0).0.get() as usize, ty.0 as usize, 0, 0, 0, 0)?;
         Ok(info as _)
     }
 }
@@ -707,7 +770,7 @@ pub fn get_process_info(process_handle: &Process, ty: ProcessInfoType) -> Result
 ///   - The process was in Exited state.
 pub(crate) fn reset_signal(event: HandleRef) -> Result<(), KernelError> {
     unsafe {
-        syscall(nr::ResetSignal, event.inner.get() as _, 0, 0, 0, 0, 0)?;
+        syscall!(nr::ResetSignal, event.inner.get() as _, 0, 0, 0, 0, 0)?;
         Ok(())
     }
 }
@@ -724,7 +787,7 @@ pub(crate) fn reset_signal(event: HandleRef) -> Result<(), KernelError> {
 ///   - The given handle is invalid or not a process.
 pub fn get_process_id(process_handle: &Process) -> Result<u64, KernelError> {
     unsafe {
-        let (pid, ..) = syscall(nr::GetProcessId, (process_handle.0).0.get() as usize, 0, 0, 0, 0, 0)?;
+        let (pid, ..) = syscall!(nr::GetProcessId, (process_handle.0).0.get() as usize, 0, 0, 0, 0, 0)?;
         Ok(pid as _)
     }
 }
@@ -740,7 +803,7 @@ pub fn get_process_id(process_handle: &Process) -> Result<u64, KernelError> {
 ///   - The process wasn't started (it is in Created or CreatedAttached state).
 pub fn terminate_process(process_handle: &Process) -> Result<(), KernelError> {
     unsafe {
-        syscall(nr::TerminateProcess, (process_handle.0).0.get() as usize, 0, 0, 0, 0, 0)?;
+        syscall!(nr::TerminateProcess, (process_handle.0).0.get() as usize, 0, 0, 0, 0, 0)?;
         Ok(())
     }
 }
@@ -753,7 +816,7 @@ pub fn terminate_process(process_handle: &Process) -> Result<(), KernelError> {
 /// bigger than the size of PidBuffer, the user won't have all the pids.
 pub fn get_process_list(list: &mut [u64]) -> Result<usize, KernelError> {
     unsafe {
-        let (read, ..) = syscall(nr::GetProcessList, list.as_ptr() as usize, list.len(), 0, 0, 0, 0)?;
+        let (read, ..) = syscall!(nr::GetProcessList, list.as_ptr() as usize, list.len(), 0, 0, 0, 0)?;
         Ok(read)
     }
 }

@@ -193,6 +193,7 @@ static MAIN_THREAD_CONTEXT: ThreadContext = ThreadContext {
 
 /// Get a pointer to this thread's [TLS] region pointed to by `fs`, translated to the flat-memory model.
 #[inline]
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 fn get_my_tls_region() -> *mut TLS {
     let mut tls: *mut TLS;
     unsafe {
@@ -203,6 +204,18 @@ fn get_my_tls_region() -> *mut TLS {
     tls
 }
 
+/// Get a pointer to this thread's [TLS] region pointed to by `TPIDRRO_EL0`.
+#[inline]
+#[cfg(target_arch = "aarch64")]
+fn get_my_tls_region() -> *mut TLS {
+    let mut tls: *mut TLS;
+    unsafe {
+        // get the address of the TLS region from TPIDRRO_EL0
+        // safe: TPIDRRO_EL0 is guaranteed by the kernel to hold a valid pointer to TLS.
+        asm!("mrs $0, TPIDRRO_EL0" : "=r" (tls));
+    }
+    tls
+}
 
 /// Get a reference to this thread's [ThreadContext], from the [TLS] region pointed to by `fs`.
 ///
@@ -337,7 +350,48 @@ impl Thread {
 /// It expects this argument to be the address of its `ThreadContext` so it can save it its `TLS`.
 ///
 /// The routine to call and its argument are expected to be found in this `ThreadContext`.
+#[cfg(target_arch = "x86")]
 extern "fastcall" fn thread_trampoline(thread_context_addr: usize) -> ! {
+    debug!("starting from new thread, context at address {:#010x}", thread_context_addr);
+    // first save the address of our context in our TLS region
+    unsafe {
+        // safe: - get_my_tls returns a valid 0x200 aligned ptr,
+        //       - .ptr_thread_context is correctly aligned in the TLS region to usize,
+        //       - we're a private fn, thread_context_addr is guaranteed by our caller to point to the context.
+        (*get_my_tls_region()).ptr_thread_context = thread_context_addr
+    };
+
+    // use get_my_thread_context to create a ref for us
+    let thread_context = get_my_thread_context();
+
+    // make gs point to our tls
+    unsafe {
+        // safe: this module guarantees that the TLS region is unique to this thread.
+        thread_context.tls_elf.r#try().unwrap().enable_for_current_thread();
+    }
+
+    // call the routine saved in the context, passing it the arg saved in the context
+    (thread_context.entry_point)(thread_context.arg);
+
+    debug!("exiting thread");
+    syscalls::exit_thread()
+}
+
+/// Small stub executed by every thread but the main thread when they start.
+///
+/// Saves the pointer to their [ThreadContext] in their [TLS], performs copy of `.tdata` and `.tbss`,
+/// calls the routine this thread was meant to perform, and calls `svcExitThread` when it's finished.
+///
+/// # ABI
+///
+/// This function is the entry point of a thread, called directly by the kernel, with the
+/// argument passed by [Thread::create].
+/// It expects this argument to be the address of its `ThreadContext` so it can save it its `TLS`.
+///
+/// The routine to call and its argument are expected to be found in this `ThreadContext`.
+#[cfg(not(target_arch = "x86"))]
+extern fn thread_trampoline(thread_context_addr: usize) -> ! {
+    // TODO: figure out aarch64 TLS
     debug!("starting from new thread, context at address {:#010x}", thread_context_addr);
     // first save the address of our context in our TLS region
     unsafe {
