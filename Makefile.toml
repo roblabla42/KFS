@@ -208,7 +208,6 @@ script = [
 mkdir -p external/filesystem/disk_template/bin/wall-clock/flags
 cp target/i386-unknown-sunrise-user/$PROFILE_NAME/sunrise-wall-clock external/filesystem/disk_template/bin/wall-clock/main
 
-# TODO: https://github.com/sagiegurari/shell2batch/issues/9
 touch external/filesystem/disk_template/bin/wall-clock/flags/boot.flag
 
 mkdir -p external/filesystem/disk_template/bin/std_hello_world/flags
