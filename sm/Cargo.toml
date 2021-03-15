@@ -12,7 +12,7 @@ log = "0.4"
 
 [dependencies.hashbrown]
 features = ["nightly"]
-version = "0.5.0"
+version = "0.6.3"
 
 [dependencies.lazy_static]
 features = ["spin_no_std"]

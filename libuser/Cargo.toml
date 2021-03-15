@@ -28,7 +28,7 @@ version = "0.4.10"
 
 [dependencies.hashbrown]
 default-features = false
-version = "0.5.0"
+version = "0.6.3"
 features = ["nightly"]
 
 [build-dependencies]
