@@ -10,7 +10,7 @@ sunrise-libkern = { path = "../libkern" }
 sunrise-libutils = { path = "../libutils" }
 log = "0.4"
 xmas-elf = "0.7.0"
-spin = "0.5.2"
+spin = "0.6.0"
 
 [dependencies.lazy_static]
 features = ["spin_no_std"]

@@ -10,7 +10,7 @@ gif = { git = "https://github.com/SunriseOS/image-gif" }
 log = "0.4.6"
 sunrise-libuser = { path = "../libuser" }
 sunrise-libkern = { path = "../libkern" }
-spin = "0.5"
+spin = "0.6"
 bstr = { version = "0.2", default-features = false }
 sha1 = { version = "0.6.0", default-features = false }
 hex = { git = "https://github.com/KokaKiwi/rust-hex", default-features = false }

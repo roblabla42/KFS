@@ -18,7 +18,7 @@ sunrise-libkern = { path = "../libkern" }
 bit_field = "0.10.0"
 bitflags = "1.1"
 multiboot2 = { git = "https://github.com/sunriseos/multiboot2-elf64.git" }
-spin = "0.5"
+spin = "0.6"
 linked_list_allocator = "0.8.4"
 log = "0.4.6"
 xmas-elf = "0.7.0"

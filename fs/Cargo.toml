@@ -9,7 +9,7 @@ edition = "2018"
 bitflags = "1.0"
 sunrise-libuser = { path = "../libuser" }
 sunrise-libutils = { path = "../libutils" }
-spin = "0.4"
+spin = "0.6"
 log = "0.4.6"
 storage_device = { git = "https://github.com/sunriseos/storage_device.git", default-features = false, features = ["cached-block-device-nightly", "alloc"] }
 libfat = { git = "https://github.com/sunriseos/libfat.git" }

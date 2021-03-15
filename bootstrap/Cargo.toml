@@ -10,7 +10,7 @@ sunrise-libutils = { path = "../libutils" }
 bit_field = "0.10.0"
 bitflags = "1.1"
 multiboot2 = { git = "https://github.com/sunriseos/multiboot2-elf64.git" }
-spin = "0.5.1"
+spin = "0.6.0"
 xmas-elf = "0.7.0"
 
 [dependencies.smallvec]

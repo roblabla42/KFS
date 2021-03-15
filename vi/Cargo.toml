@@ -9,7 +9,7 @@ edition = "2018"
 sunrise-libuser = { path = "../libuser" }
 sunrise-libkern = { path = "../libkern" }
 sunrise-libutils = { path = "../libutils" }
-spin = "0.5"
+spin = "0.6"
 futures-preview = { version = "0.3.0-alpha.16", default-features = false, features = ["nightly", "alloc"] }
 font-rs = { git = "https://github.com/SunriseOS/font-rs", default-features = false }
 log = "0.4"

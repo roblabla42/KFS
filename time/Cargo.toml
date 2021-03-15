@@ -8,7 +8,7 @@ edition = "2018"
 
 [dependencies]
 generic-array = "0.13.0"
-spin = "0.5"
+spin = "0.6"
 log = "0.4.6"
 sunrise-libuser = { path = "../libuser" }
 sunrise-libutils = { path = "../libutils" }
