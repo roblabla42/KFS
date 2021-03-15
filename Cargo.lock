@@ -203,7 +203,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 [[package]]
 name = "cargo-5730"
 version = "0.1.0"
-source = "git+https://github.com/Thog/cargo-5730.git?branch=feature/windows-support#be3c927c3d38df740db41f41fb872f130b79ea6f"
+source = "git+https://github.com/Thog/cargo-5730.git?branch=feature/windows-support#e29cde8a442ae81dc2dcbdd0c4f201520e32940f"
 
 [[package]]
 name = "cat"
